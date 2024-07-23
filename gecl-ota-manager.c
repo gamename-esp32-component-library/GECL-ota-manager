@@ -175,7 +175,7 @@ void ota_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
-    set_led(LED_FLASHING_GREEN);
+    // set_led(LED_FLASHING_GREEN);
 
     cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
