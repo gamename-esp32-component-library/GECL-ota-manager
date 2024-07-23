@@ -32,5 +32,7 @@ menu "GECL OTA Manager Configuration"
         default "${WIFI_HOSTNAME}"
         help
             Set the WiFi hostname.
+    endif
+
 endmenu
     
