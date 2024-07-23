@@ -19,6 +19,18 @@ menu "GECL OTA Manager Configuration"
         depends on GECL_OTA_MANAGER_ENABLED
         help
             Set the MQTT topic where the OTA progress will be published.
+
+    config GECL_OTA_MANAGER_USE_WIFI_HOSTNAME
+        bool "Use WiFi hostname from parent project"
+        default y
+        help
+            Enable WiFi usage in GECL OTA manager.
     
+    if GECL_OTA_MANAGER_USE_WIFI_HOSTNAME
+    config GECL_OTA_MANAGER_WIFI_HOSTNAME 
+        string "WiFi Hostname this component"
+        default "${WIFI_HOSTNAME}"
+        help
+            Set the WiFi hostname.
 endmenu
     
