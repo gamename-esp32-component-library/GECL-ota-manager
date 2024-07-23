@@ -243,7 +243,7 @@ void ota_task(void *pvParameter) {
                 sprintf(ota_progress_buffer, "%02d:%02d elapsed...", loop_minutes, loop_seconds);
 
                 cJSON *root = cJSON_CreateObject();
-                cJSON_AddStringToObject(root, CONFIG_WIFI_HOSTNAME, ota_progress_buffer);
+                cJSON_AddStringToObject(root, CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME, ota_progress_buffer);
                 const char *json_string = cJSON_Print(root);
 
                 send_log_message(ESP_LOG_WARN, TAG, "Copying image to %s. %s", update_partition->label,
@@ -290,7 +290,7 @@ void ota_task(void *pvParameter) {
 
             cJSON *root = cJSON_CreateObject();
             sprintf(ota_progress_buffer, "OTA COMPLETED. Duration: %02d:%02d:%02d", hours, minutes, seconds);
-            cJSON_AddStringToObject(root, CONFIG_WIFI_HOSTNAME, ota_progress_buffer);
+            cJSON_AddStringToObject(root, CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME, ota_progress_buffer);
             const char *json_string = cJSON_Print(root);
 
             send_log_message(ESP_LOG_INFO, TAG,
