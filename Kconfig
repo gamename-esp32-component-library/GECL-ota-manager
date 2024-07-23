@@ -1,0 +1,24 @@
+menu "GECL OTA Manager Configuration"
+
+    config GECL_OTA_MANAGER_ENABLED
+        bool "Enable OTA Manager"
+        default y
+        help
+            Enable or disable the OTA Manager component.
+    
+    config GECL_OTA_MANAGER_UPDATE_INTERVAL
+        int "OTA Update Interval (seconds)"
+        default 86400
+        depends on GECL_OTA_MANAGER_ENABLED
+        help
+            Set the interval at which the OTA manager checks for updates.
+    
+    config GECL_MQTT_PUBLISH_OTA_PROGRESS_TOPIC
+        string "MQTT Topic for Publishing OTA Progress"
+        default "farm/update/progress"
+        depends on GECL_OTA_MANAGER_ENABLED
+        help
+            Set the MQTT topic where the OTA progress will be published.
+    
+endmenu
+    

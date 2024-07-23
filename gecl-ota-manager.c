@@ -248,7 +248,7 @@ void ota_task(void *pvParameter) {
 
                 send_log_message(ESP_LOG_WARN, TAG, "Copying image to %s. %s", update_partition->label,
                                  ota_progress_buffer);
-                esp_mqtt_client_publish(my_mqtt_client, CONFIG_MQTT_PUBLISH_OTA_PROGRESS_TOPIC, json_string, 0, 1, 0);
+                esp_mqtt_client_publish(my_mqtt_client, CONFIG_GECL_MQTT_PUBLISH_OTA_PROGRESS_TOPIC, json_string, 0, 1, 0);
 
                 cJSON_Delete(root);
                 free((void *)json_string);
