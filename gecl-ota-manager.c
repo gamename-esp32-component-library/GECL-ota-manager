@@ -248,7 +248,7 @@ void ota_task(void *pvParameter) {
 
                 send_log_message(ESP_LOG_WARN, TAG, "Copying image to %s. %s", update_partition->label,
                                  ota_progress_buffer);
-                esp_mqtt_client_publish(my_mqtt_client, CONFIG_GECL_MQTT_PUBLISH_OTA_PROGRESS_TOPIC, json_string, 0, 1, 0);
+                esp_mqtt_client_publish(my_mqtt_client, CONIG_GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC, json_string, 0, 1, 0);
 
                 cJSON_Delete(root);
                 free((void *)json_string);
@@ -296,7 +296,7 @@ void ota_task(void *pvParameter) {
             send_log_message(ESP_LOG_INFO, TAG,
                              "Image copy successful. Duration: %02d:%02d:%02d. Will reboot from partition %s", hours,
                              minutes, seconds, update_partition->label);
-            esp_mqtt_client_publish(my_mqtt_client, CONFIG_MQTT_PUBLISH_OTA_PROGRESS_TOPIC, json_string, 0, 1, 0);
+            esp_mqtt_client_publish(my_mqtt_client, CONFIG_GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC, json_string, 0, 1, 0);
 
             cJSON_Delete(root);
             free((void *)json_string);
