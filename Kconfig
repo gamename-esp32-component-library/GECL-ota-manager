@@ -29,7 +29,7 @@ menu "GECL OTA Manager Configuration"
     if GECL_OTA_MANAGER_USE_WIFI_HOSTNAME
     config GECL_OTA_MANAGER_WIFI_HOSTNAME 
         string "WiFi Hostname this component"
-        default "${WIFI_HOSTNAME}"
+        default "${CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME_INTERNAL}"
         help
             Set the WiFi hostname.
     endif
