@@ -21,20 +21,23 @@ menu "GECL OTA Manager Configuration"
             Set the MQTT topic where the OTA progress will be published.
 
     config GECL_OTA_MANAGER_WIFI_HOSTNAME
-        bool "Use WiFi hostname"
+        string "Use WiFi hostname"
         default "nemo" 
+        depends on GECL_OTA_MANAGER_ENABLED
         help
             Enable WiFi usage in GECL OTA manager.
          
     config GECL_OTA_MANAGER_SUBSCRIBE_UPDATE_TOPIC
         string "MQTT Over-The-Air (OTA) update topic"
         default "coop/update/controller"
+        depends on GECL_OTA_MANAGER_ENABLED
         help
             Set the MQTT OTA topic to subscribe to.
 
     config GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC
         string "MQTT log of Over-The-Air (OTA) update progress"
         default "farm/update/progress"
+        depends on GECL_OTA_MANAGER_ENABLED
         help
             Publish to an MQTT OTA topic to indicate update progress.
 endmenu
