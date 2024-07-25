@@ -120,11 +120,14 @@ void ota_task(void *pvParameter) {
     int loop_seconds = 0;
 
     esp_err_t ota_finish_err = ESP_OK;
-    char *mqtt_data = pvParameter;
-
     set_led(LED_FLASHING_GREEN);
 
-    cJSON *json = cJSON_Parse(mqtt_data);
+    esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
+    esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
+
+    ESP_LOGI(TAG, "Received OTA request: %s", mqtt_event->data);
+
+    cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
         send_log_message(ESP_LOG_ERROR, TAG, "Failed to parse JSON string");
         graceful_restart(my_mqtt_client);
