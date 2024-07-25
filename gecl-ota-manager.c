@@ -125,7 +125,7 @@ void ota_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
-    ESP_LOGI(TAG, "Received OTA request: %s", mqtt_event->data);
+    send_log_message(ESP_LOG_INFO, TAG, "Received OTA request: %s", mqtt_event->data);
 
     cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
