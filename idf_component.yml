@@ -1,5 +1,0 @@
-version: "1.0.0"
-description: "OTA manager component for ESP32" 
-url: https://github.com/gamename-esp32-component-library/GECL-ota-manager 
-dependencies:
-  idf: ">=4.1"
