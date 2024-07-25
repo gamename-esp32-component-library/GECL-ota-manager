@@ -18,5 +18,6 @@ idf_component_register(
         mqtt 
         json 
         gecl-logger-manager 
+        gecl-rgb-lcd-manager 
         lwip
     )

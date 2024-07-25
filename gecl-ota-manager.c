@@ -8,6 +8,7 @@
 #include "esp_sleep.h"
 #include "esp_timer.h"
 #include "gecl-logger-manager.h"
+#include "gecl-rgb-led-manager.h"
 // #include "led.h"
 #include "mqtt.h"
 #include "sdkconfig.h"
