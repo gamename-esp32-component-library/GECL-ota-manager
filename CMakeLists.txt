@@ -19,5 +19,6 @@ idf_component_register(
         json 
         gecl-logger-manager 
         gecl-rgb-led-manager 
+        gecl-mqtt-manager
         lwip
     )
