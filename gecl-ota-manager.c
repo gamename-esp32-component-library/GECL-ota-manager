@@ -120,7 +120,7 @@ void ota_task(void *pvParameter) {
     int loop_seconds = 0;
 
     esp_err_t ota_finish_err = ESP_OK;
-    // set_led(LED_FLASHING_GREEN);
+    set_led(LED_FLASHING_GREEN);
 
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
