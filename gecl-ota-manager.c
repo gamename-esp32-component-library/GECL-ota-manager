@@ -8,16 +8,15 @@
 #include "esp_sleep.h"
 #include "esp_timer.h"
 #include "gecl-logger-manager.h"
+#include "gecl-misc-util-manager.h"
 #include "gecl-mqtt-manager.h"
 #include "gecl-rgb-led-manager.h"
-// #include "led.h"
 #include "sdkconfig.h"
 
 extern const uint8_t AmazonRootCA1_pem[];
 
 static const char *TAG = "OTA";
 static const char *HOST_KEY = "controller";
-static const char *CHECKSUM_KEY = "checksum";
 
 #define MAX_RETRIES 5
 #define LOG_PROGRESS_INTERVAL 100
@@ -118,6 +117,10 @@ void ota_task(void *pvParameter) {
     int loop_count = 0;
     int loop_minutes = 0;
     int loop_seconds = 0;
+    char mac_address[18];
+
+    get_burned_in_mac_address(mac_address);
+    send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
 
     esp_err_t ota_finish_err = ESP_OK;
     // set_led(LED_FLASHING_GREEN);
