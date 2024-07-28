@@ -138,7 +138,7 @@ void ota_task(void *pvParameter) {
     cJSON *host_key = cJSON_GetObjectItem(json, mac_address);
     const char *host_key_value = cJSON_GetStringValue(host_key);
     if (!host_key || !host_key_value) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Invalid or missing '%s' key in JSON", HOST_KEY);
+        send_log_message(ESP_LOG_ERROR, TAG, "Invalid or missing '%s' key in JSON", mac_address);
         cJSON_Delete(json);
         graceful_restart(my_mqtt_client);
     }
