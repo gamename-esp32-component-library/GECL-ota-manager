@@ -21,8 +21,6 @@ static const char *TAG = "OTA";
 #define LOG_PROGRESS_INTERVAL 100
 #define MAX_URL_LENGTH 512
 #define OTA_PROGRESS_MESSAGE_LENGTH 128
-#define SHA256_CHECKSUM_LENGTH 64
-#define SHA256_CHECKSUM_BUFFER_LENGTH (SHA256_CHECKSUM_LENGTH + 1)
 
 // Helper function to handle NVS errors and close the handle
 static esp_err_t nvs_get_u32_safe(nvs_handle_t nvs_handle, const char *key, uint32_t *out_value) {
@@ -109,7 +107,6 @@ void ota_task(void *pvParameter) {
 
     char url_buffer[MAX_URL_LENGTH];
     char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
-    char expected_checksum_buffer[SHA256_CHECKSUM_BUFFER_LENGTH];
 
     int64_t start_time = esp_timer_get_time();
     int retries = 0;
