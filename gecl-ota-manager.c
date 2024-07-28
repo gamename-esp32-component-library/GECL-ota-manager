@@ -16,7 +16,6 @@
 extern const uint8_t AmazonRootCA1_pem[];
 
 static const char *TAG = "OTA";
-static const char *HOST_KEY = "controller";
 
 #define MAX_RETRIES 5
 #define LOG_PROGRESS_INTERVAL 100
@@ -136,7 +135,7 @@ void ota_task(void *pvParameter) {
         graceful_restart(my_mqtt_client);
     }
 
-    cJSON *host_key = cJSON_GetObjectItem(json, HOST_KEY);
+    cJSON *host_key = cJSON_GetObjectItem(json, mac_address);
     const char *host_key_value = cJSON_GetStringValue(host_key);
     if (!host_key || !host_key_value) {
         send_log_message(ESP_LOG_ERROR, TAG, "Invalid or missing '%s' key in JSON", HOST_KEY);
