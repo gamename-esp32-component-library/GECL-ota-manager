@@ -134,24 +134,6 @@ void ota_task(void *pvParameter) {
     int loop_count = 0;
     char mac_address[18];
 
-    // Define the configuration for the Task Watchdog Timer
-    esp_task_wdt_config_t wdt_config = {
-        .timeout_ms = 10000,    // Timeout in milliseconds (10 seconds)
-        .idle_core_mask = 0,    // Mask to subscribe idle tasks (core 0 and core 1)
-        .trigger_panic = true,  // Trigger panic on timeout
-    };
-
-    // Initialize the Task Watchdog Timer with the defined configuration
-    esp_err_t ret = esp_task_wdt_init(&wdt_config);
-    if (ret == ESP_OK) {
-        send_log_message(ESP_LOG_INFO, TAG, "Task Watchdog Timer initialized successfully");
-    } else {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to initialize Task Watchdog Timer: %s", esp_err_to_name(ret));
-    }
-
-    // Add the current task to the Task Watchdog Timer
-    esp_task_wdt_add(NULL);
-
     get_burned_in_mac_address(mac_address);
     send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
 
