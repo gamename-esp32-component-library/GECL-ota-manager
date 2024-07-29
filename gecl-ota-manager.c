@@ -238,19 +238,19 @@ void ota_task(void *pvParameter) {
             int minutes = (duration_s % 3600) / 60;
             int seconds = duration_s % 60;
 
-            cJSON *root = cJSON_CreateObject();
-            sprintf(ota_progress_buffer, "OTA COMPLETED. Duration: %02d:%02d:%02d", hours, minutes, seconds);
-            cJSON_AddStringToObject(root, CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME, ota_progress_buffer);
-            const char *json_string = cJSON_Print(root);
+            // cJSON *root = cJSON_CreateObject();
+            // sprintf(ota_progress_buffer, "OTA COMPLETED. Duration: %02d:%02d:%02d", hours, minutes, seconds);
+            // cJSON_AddStringToObject(root, CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME, ota_progress_buffer);
+            // const char *json_string = cJSON_Print(root);
 
-            send_log_message(ESP_LOG_INFO, TAG,
-                             "Image copy successful. Duration: %02d:%02d:%02d. Will reboot from partition %s", hours,
-                             minutes, seconds, update_partition->label);
-            esp_mqtt_client_publish(my_mqtt_client, CONFIG_GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC, json_string, 0, 1,
-                                    0);
-
-            cJSON_Delete(root);
-            free((void *)json_string);
+            // send_log_message(ESP_LOG_INFO, TAG,
+            //                  "Image copy successful. Duration: %02d:%02d:%02d. Will reboot from partition %s", hours,
+            //                  minutes, seconds, update_partition->label);
+            // esp_mqtt_client_publish(my_mqtt_client, CONFIG_GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC, json_string, 0,
+            // 1,
+            //                         0);
+            // cJSON_Delete(root);
+            // free((void *)json_string);
         } else {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
         }
