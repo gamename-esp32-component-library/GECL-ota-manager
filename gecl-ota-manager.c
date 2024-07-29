@@ -134,6 +134,24 @@ void ota_task(void *pvParameter) {
     int loop_count = 0;
     char mac_address[18];
 
+    // Define the configuration for the Task Watchdog Timer
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = 10000,    // Timeout in milliseconds (10 seconds)
+        .idle_core_mask = 0,    // Mask to subscribe idle tasks (core 0 and core 1)
+        .trigger_panic = true,  // Trigger panic on timeout
+    };
+
+    // Initialize the Task Watchdog Timer with the defined configuration
+    esp_err_t ret = esp_task_wdt_init(&wdt_config);
+    if (ret == ESP_OK) {
+        send_log_message(ESP_LOG_INFO, TAG, "Task Watchdog Timer initialized successfully");
+    } else {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to initialize Task Watchdog Timer: %s", esp_err_to_name(ret));
+    }
+
+    // Add the current task to the Task Watchdog Timer
+    esp_task_wdt_add(NULL);
+
     // Initialize Task Watchdog Timer with a timeout of 10 seconds
     esp_task_wdt_init(10, true);
 
@@ -210,6 +228,8 @@ void ota_task(void *pvParameter) {
             // }
             // loop_count++;
             vTaskDelay(100 / portTICK_PERIOD_MS);
+            esp_task_wdt_reset();
+
             continue;
         } else if (err != ESP_OK) {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
@@ -222,6 +242,7 @@ void ota_task(void *pvParameter) {
             break;
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        esp_task_wdt_reset();
     }
 
     if (esp_https_ota_is_complete_data_received(ota_handle)) {
