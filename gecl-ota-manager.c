@@ -204,8 +204,6 @@ void ota_task(void *pvParameter) {
             // }
             // loop_count++;
             vTaskDelay(100 / portTICK_PERIOD_MS);
-            esp_task_wdt_reset();
-
             continue;
         } else if (err != ESP_OK) {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
@@ -218,7 +216,6 @@ void ota_task(void *pvParameter) {
             break;
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp_task_wdt_reset();
     }
 
     if (esp_https_ota_is_complete_data_received(ota_handle)) {
