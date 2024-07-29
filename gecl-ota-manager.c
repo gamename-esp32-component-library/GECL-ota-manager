@@ -6,6 +6,8 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "gecl-logger-manager.h"
 #include "gecl-misc-util-manager.h"
@@ -131,6 +133,12 @@ void ota_task(void *pvParameter) {
     int retries = 0;
     int loop_count = 0;
     char mac_address[18];
+
+    // Initialize Task Watchdog Timer with a timeout of 10 seconds
+    esp_task_wdt_init(10, true);
+
+    // Set the Interrupt Watchdog Timer timeout to 10 seconds
+    esp_task_wdt_add(NULL);  // Add the current task to the TWDT
 
     get_burned_in_mac_address(mac_address);
     send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
