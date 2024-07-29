@@ -152,12 +152,6 @@ void ota_task(void *pvParameter) {
     // Add the current task to the Task Watchdog Timer
     esp_task_wdt_add(NULL);
 
-    // Initialize Task Watchdog Timer with a timeout of 10 seconds
-    esp_task_wdt_init(10, true);
-
-    // Set the Interrupt Watchdog Timer timeout to 10 seconds
-    esp_task_wdt_add(NULL);  // Add the current task to the TWDT
-
     get_burned_in_mac_address(mac_address);
     send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
 
