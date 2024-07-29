@@ -193,6 +193,8 @@ void ota_task(void *pvParameter) {
                 free((void *)json_string);
             }
             loop_count++;
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            continue
         } else if (err != ESP_OK) {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
             if (++retries > MAX_RETRIES) {
