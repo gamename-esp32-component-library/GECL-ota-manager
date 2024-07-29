@@ -22,5 +22,6 @@ idf_component_register(
         gecl-mqtt-manager
         gecl-misc-util-manager
         gecl-heartbeat-manager
+        gecl-time-sync-manager
         lwip
     )
