@@ -201,10 +201,6 @@ void ota_task(void *pvParameter) {
     while (1) {
         err = esp_https_ota_perform(ota_handle);
         if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            // if (loop_count % LOG_PROGRESS_INTERVAL == 0) {
-            // publish_progress(my_mqtt_client, update_partition, loop_count);
-            // }
-            // loop_count++;
             esp_task_wdt_reset();
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
