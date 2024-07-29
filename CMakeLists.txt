@@ -21,5 +21,6 @@ idf_component_register(
         gecl-rgb-led-manager 
         gecl-mqtt-manager
         gecl-misc-util-manager
+        gecl-heartbeat-manager
         lwip
     )
