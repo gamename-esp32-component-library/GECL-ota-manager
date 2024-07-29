@@ -101,9 +101,10 @@ void graceful_restart(esp_mqtt_client_handle_t mqtt_client) {
     esp_restart();
 }
 
-void publish_progress(esp_mqtt_client_handle_t mqtt_client, int loop_count) {
+void publish_progress(esp_mqtt_client_handle_t mqtt_client, esp_partition_t *partition, int loop_count) {
     int loop_minutes = 0;
     int loop_seconds = 0;
+    char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
 
     convert_seconds(loop_count, &loop_minutes, &loop_seconds);
     sprintf(ota_progress_buffer, "%02d:%02d elapsed...", loop_minutes, loop_seconds);
@@ -112,7 +113,7 @@ void publish_progress(esp_mqtt_client_handle_t mqtt_client, int loop_count) {
     cJSON_AddStringToObject(root, CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME, ota_progress_buffer);
     const char *json_string = cJSON_Print(root);
 
-    send_log_message(ESP_LOG_WARN, TAG, "Copying image to %s. %s", update_partition->label, ota_progress_buffer);
+    send_log_message(ESP_LOG_WARN, TAG, "Copying image to %s. %s", partition->label, ota_progress_buffer);
     esp_mqtt_client_publish(mqtt_client, CONFIG_GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC, json_string, 0, 1, 0);
 
     cJSON_Delete(root);
@@ -124,7 +125,6 @@ void ota_task(void *pvParameter) {
     send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
 
     char url_buffer[MAX_URL_LENGTH];
-    char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
 
     int64_t start_time = esp_timer_get_time();
     int retries = 0;
@@ -203,7 +203,7 @@ void ota_task(void *pvParameter) {
             }
 
             if (loop_count % LOG_PROGRESS_INTERVAL == 0) {
-                publish_progress(my_mqtt_client, loop_count);
+                publish_progress(my_mqtt_client, update_partition, loop_count);
             }
             loop_count++;
             vTaskDelay(10 / portTICK_PERIOD_MS);
