@@ -22,6 +22,8 @@ static const char *TAG = "OTA";
 #define MAX_URL_LENGTH 512
 #define OTA_PROGRESS_MESSAGE_LENGTH 128
 
+char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
+
 // Helper function to handle NVS errors and close the handle
 static esp_err_t nvs_get_u32_safe(nvs_handle_t nvs_handle, const char *key, uint32_t *out_value) {
     esp_err_t err = nvs_get_u32(nvs_handle, key, out_value);
@@ -104,7 +106,6 @@ void graceful_restart(esp_mqtt_client_handle_t mqtt_client) {
 void publish_progress(esp_mqtt_client_handle_t mqtt_client, esp_partition_t *partition, int loop_count) {
     int loop_minutes = 0;
     int loop_seconds = 0;
-    char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
 
     convert_seconds(loop_count, &loop_minutes, &loop_seconds);
     sprintf(ota_progress_buffer, "%02d:%02d elapsed...", loop_minutes, loop_seconds);
