@@ -196,17 +196,11 @@ void ota_task(void *pvParameter) {
     while (1) {
         err = esp_https_ota_perform(ota_handle);
         if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            data_read = esp_https_ota_read(ota_handle, buffer, sizeof(buffer));
-            if (data_read > 0) {
-                // Process the data chunk
-                esp_https_ota_write(ota_handle, buffer, data_read);
-            }
-
-            if (loop_count % LOG_PROGRESS_INTERVAL == 0) {
-                publish_progress(my_mqtt_client, update_partition, loop_count);
-            }
-            loop_count++;
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+            // if (loop_count % LOG_PROGRESS_INTERVAL == 0) {
+            // publish_progress(my_mqtt_client, update_partition, loop_count);
+            // }
+            // loop_count++;
+            vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         } else if (err != ESP_OK) {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
