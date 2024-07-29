@@ -134,6 +134,8 @@ void ota_task(void *pvParameter) {
     int loop_count = 0;
     char mac_address[18];
 
+    esp_task_wdt_add(NULL);
+
     get_burned_in_mac_address(mac_address);
     send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
 
@@ -203,6 +205,7 @@ void ota_task(void *pvParameter) {
             // publish_progress(my_mqtt_client, update_partition, loop_count);
             // }
             // loop_count++;
+            esp_task_wdt_reset();
             vTaskDelay(100 / portTICK_PERIOD_MS);
             continue;
         } else if (err != ESP_OK) {
@@ -215,6 +218,7 @@ void ota_task(void *pvParameter) {
         } else {
             break;
         }
+        esp_task_wdt_reset();
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
@@ -254,5 +258,6 @@ void ota_task(void *pvParameter) {
         send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
     }
 
+    esp_task_wdt_delete(NULL);
     graceful_restart(my_mqtt_client);
 }
