@@ -140,12 +140,9 @@ void ota_task(void *pvParameter) {
     send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
 
     esp_err_t ota_finish_err = ESP_OK;
-    // set_led(LED_FLASHING_GREEN);
 
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
-
-    // send_log_message(ESP_LOG_INFO, TAG, "Received OTA request: %s", mqtt_event->data);
 
     cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
@@ -229,6 +226,7 @@ void ota_task(void *pvParameter) {
         send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
     }
 
+    esp_task_wdt_reset();
     esp_task_wdt_delete(NULL);
     esp_restart();
 }
