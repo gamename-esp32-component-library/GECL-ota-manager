@@ -114,58 +114,6 @@ void convert_seconds(int totalSeconds, int *minutes, int *seconds) {
     *seconds = totalSeconds % 60;
 }
 
-// Main OTA task
-void ota_task(void *pvParameter) {
-    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
-
-    esp_https_ota_config_t *ota_config = (esp_https_ota_config_t *)pvParameter;
-
-    esp_task_wdt_add(NULL);
-
-    esp_https_ota_handle_t ota_handle = NULL;
-    esp_err_t err = esp_https_ota_begin(ota_config, &ota_handle);
-    if (err != ESP_OK) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to start OTA: %s", esp_err_to_name(err));
-        OTA_FAIL_EXIT();
-    }
-
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    if (!update_partition) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to find update partition");
-        OTA_FAIL_EXIT();
-    }
-
-    send_log_message(ESP_LOG_INFO, TAG, "OTA update partition: %s", update_partition->label);
-
-    while (1) {
-        err = esp_https_ota_perform(ota_handle);
-        if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            esp_task_wdt_reset();
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            continue;
-        } else if (err != ESP_OK) {
-            send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
-            OTA_FAIL_EXIT();
-        } else {
-            break;
-        }
-    }
-
-    if (esp_https_ota_is_complete_data_received(ota_handle)) {
-        esp_err_t ota_finish_err = esp_https_ota_finish(ota_handle);
-        if (ota_finish_err == ESP_OK) {
-            send_log_message(ESP_LOG_INFO, TAG, "Success - OTA update complete!");
-            OTA_COMPLETE_EXIT();
-        } else {
-            send_log_message(ESP_LOG_ERROR, TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
-            OTA_FAIL_EXIT();
-        }
-    } else {
-        send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
-        OTA_FAIL_EXIT();
-    }
-}
-
 void ota_handler_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
@@ -234,4 +182,55 @@ void ota_handler_task(void *pvParameter) {
 
     // Delete the handler task
     vTaskDelete(NULL);
+}
+
+void ota_task(void *pvParameter) {
+    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
+
+    esp_https_ota_config_t *ota_config = (esp_https_ota_config_t *)pvParameter;
+
+    esp_task_wdt_add(NULL);
+
+    esp_https_ota_handle_t ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(ota_config, &ota_handle);
+    if (err != ESP_OK) {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to start OTA: %s", esp_err_to_name(err));
+        OTA_FAIL_EXIT();
+    }
+
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    if (!update_partition) {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to find update partition");
+        OTA_FAIL_EXIT();
+    }
+
+    send_log_message(ESP_LOG_INFO, TAG, "OTA update partition: %s", update_partition->label);
+
+    while (1) {
+        err = esp_https_ota_perform(ota_handle);
+        if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            esp_task_wdt_reset();
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        } else if (err != ESP_OK) {
+            send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
+            OTA_FAIL_EXIT();
+        } else {
+            break;
+        }
+    }
+
+    if (esp_https_ota_is_complete_data_received(ota_handle)) {
+        esp_err_t ota_finish_err = esp_https_ota_finish(ota_handle);
+        if (ota_finish_err == ESP_OK) {
+            send_log_message(ESP_LOG_INFO, TAG, "Success - OTA update complete!");
+            OTA_COMPLETE_EXIT();
+        } else {
+            send_log_message(ESP_LOG_ERROR, TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
+            OTA_FAIL_EXIT();
+        }
+    } else {
+        send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
+        OTA_FAIL_EXIT();
+    }
 }
