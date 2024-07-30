@@ -19,10 +19,28 @@ extern const uint8_t AmazonRootCA1_pem[];
 
 static const char *TAG = "OTA";
 
+static EventGroupHandle_t ota_event_group;
+const int OTA_COMPLETE_BIT = BIT0;
+const int OTA_FAILED_BIT = BIT1;
+
 #define MAX_RETRIES 5
 #define LOG_PROGRESS_INTERVAL 100
 #define MAX_URL_LENGTH 512
 #define OTA_PROGRESS_MESSAGE_LENGTH 128
+
+#define OTA_FAIL_EXIT()                                      \
+    do {                                                     \
+        xEventGroupSetBits(ota_event_group, OTA_FAILED_BIT); \
+        esp_task_wdt_delete(NULL);                           \
+        vTaskDelete(NULL);                                   \
+    } while (0)
+
+#define OTA_COMPLETE_EXIT()                                    \
+    do {                                                       \
+        xEventGroupSetBits(ota_event_group, OTA_COMPLETE_BIT); \
+        esp_task_wdt_delete(NULL);                             \
+        vTaskDelete(NULL);                                     \
+    } while (0)
 
 char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
 
@@ -96,67 +114,81 @@ void convert_seconds(int totalSeconds, int *minutes, int *seconds) {
     *seconds = totalSeconds % 60;
 }
 
-// Perform a graceful restart
-void graceful_restart(esp_mqtt_client_handle_t mqtt_client) {
-    if (mqtt_client != NULL) {
-        ESP_LOGI(TAG, "Stopping MQTT client");
-        esp_mqtt_client_stop(mqtt_client);
-    }
-    esp_restart();
-}
-
-void publish_progress(esp_mqtt_client_handle_t mqtt_client, esp_partition_t *partition, int loop_count) {
-    int loop_minutes = 0;
-    int loop_seconds = 0;
-
-    convert_seconds(loop_count, &loop_minutes, &loop_seconds);
-    sprintf(ota_progress_buffer, "%02d:%02d elapsed...", loop_minutes, loop_seconds);
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, CONFIG_GECL_OTA_MANAGER_WIFI_HOSTNAME, ota_progress_buffer);
-    const char *json_string = cJSON_Print(root);
-
-    send_log_message(ESP_LOG_WARN, TAG, "Copying image to %s. %s", partition->label, ota_progress_buffer);
-    esp_mqtt_client_publish(mqtt_client, CONFIG_GECL_OTA_MANAGER_PUBLISH_PROGRESS_TOPIC, json_string, 0, 1, 0);
-
-    cJSON_Delete(root);
-    free((void *)json_string);
-}
-
 // Main OTA task
 void ota_task(void *pvParameter) {
     send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
 
-    char url_buffer[MAX_URL_LENGTH];
-
-    int64_t start_time = esp_timer_get_time();
-    int retries = 0;
-    int loop_count = 0;
-    char mac_address[18];
+    esp_https_ota_config_t *ota_config = (esp_https_ota_config_t *)pvParameter;
 
     esp_task_wdt_add(NULL);
 
-    get_burned_in_mac_address(mac_address);
-    send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
+    esp_https_ota_handle_t ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(ota_config, &ota_handle);
+    if (err != ESP_OK) {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to start OTA: %s", esp_err_to_name(err));
+        OTA_FAIL_EXIT();
+    }
 
-    esp_err_t ota_finish_err = ESP_OK;
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    if (!update_partition) {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to find update partition");
+        OTA_FAIL_EXIT();
+    }
 
+    send_log_message(ESP_LOG_INFO, TAG, "OTA update partition: %s", update_partition->label);
+
+    while (1) {
+        err = esp_https_ota_perform(ota_handle);
+        if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            esp_task_wdt_reset();
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        } else if (err != ESP_OK) {
+            send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
+            OTA_FAIL_EXIT();
+        } else {
+            break;
+        }
+    }
+
+    if (esp_https_ota_is_complete_data_received(ota_handle)) {
+        esp_err_t ota_finish_err = esp_https_ota_finish(ota_handle);
+        if (ota_finish_err == ESP_OK) {
+            send_log_message(ESP_LOG_INFO, TAG, "Success - OTA update complete!");
+            OTA_COMPLETE_EXIT();
+        } else {
+            send_log_message(ESP_LOG_ERROR, TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
+            OTA_FAIL_EXIT();
+        }
+    } else {
+        send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
+        OTA_FAIL_EXIT();
+    }
+}
+
+void ota_handler_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
     cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
         send_log_message(ESP_LOG_ERROR, TAG, "Failed to parse JSON string");
-        graceful_restart(my_mqtt_client);
+        OTA_FAIL_EXIT();
     }
+
+    char mac_address[18];
+    get_burned_in_mac_address(mac_address);
+    send_log_message(ESP_LOG_INFO, TAG, "Burned-In MAC Address: %s\n", mac_address);
 
     cJSON *host_key = cJSON_GetObjectItem(json, mac_address);
     const char *host_key_value = cJSON_GetStringValue(host_key);
     if (!host_key || !host_key_value) {
         send_log_message(ESP_LOG_ERROR, TAG, "Invalid or missing '%s' key in JSON", mac_address);
         cJSON_Delete(json);
-        graceful_restart(my_mqtt_client);
+        OTA_FAIL_EXIT();
     }
+
+    char url_buffer[MAX_URL_LENGTH];
     strncpy(url_buffer, host_key_value, MAX_URL_LENGTH - 1);
     url_buffer[MAX_URL_LENGTH - 1] = '\0';
 
@@ -176,58 +208,21 @@ void ota_task(void *pvParameter) {
         .http_config = &config,
     };
 
-    esp_https_ota_handle_t ota_handle = NULL;
-    esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
-    if (err != ESP_OK) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to start OTA: %s", esp_err_to_name(err));
-        graceful_restart(my_mqtt_client);
+    // Create the OTA task and pass the ota_config
+    xTaskCreate(&ota_task, "ota_task", 8192, &ota_config, 5, NULL);
+
+    // Wait for OTA completion
+    EventBits_t bits =
+        xEventGroupWaitBits(ota_event_group, OTA_COMPLETE_BIT | OTA_FAILED_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+
+    if (bits & OTA_COMPLETE_BIT) {
+        // Reboot the system
+        esp_restart();
+    } else if (bits & OTA_FAILED_BIT) {
+        // Handle OTA failure
+        send_log_message(ESP_LOG_ERROR, TAG, "OTA FAILED");
     }
 
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    if (!update_partition) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to find update partition");
-        graceful_restart(my_mqtt_client);
-    }
-
-    send_log_message(ESP_LOG_INFO, TAG, "OTA update partition: %s", update_partition->label);
-
-    // Buffer to store read data
-    uint8_t buffer[1024];
-    int data_read;
-
-    while (1) {
-        err = esp_https_ota_perform(ota_handle);
-        if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            esp_task_wdt_reset();
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            continue;
-        } else if (err != ESP_OK) {
-            send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
-            if (++retries > MAX_RETRIES) {
-                send_log_message(ESP_LOG_ERROR, TAG, "Max retries reached, aborting OTA");
-                graceful_restart(my_mqtt_client);
-            }
-            send_log_message(ESP_LOG_INFO, TAG, "Retrying OTA...");
-        } else {
-            break;
-        }
-        esp_task_wdt_reset();
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-
-    if (esp_https_ota_is_complete_data_received(ota_handle)) {
-        ota_finish_err = esp_https_ota_finish(ota_handle);
-        if (ota_finish_err == ESP_OK) {
-            send_log_message(ESP_LOG_INFO, TAG, "OTA update complete!");
-            esp_restart();
-        } else {
-            send_log_message(ESP_LOG_ERROR, TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
-        }
-    } else {
-        send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
-    }
-
-    esp_task_wdt_reset();
-    esp_task_wdt_delete(NULL);
-    esp_restart();
+    // Delete the handler task
+    vTaskDelete(NULL);
 }
