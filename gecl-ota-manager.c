@@ -208,6 +208,15 @@ void ota_handler_task(void *pvParameter) {
         .http_config = &config,
     };
 
+    // Ensure the event group is created
+    if (ota_event_group == NULL) {
+        ota_event_group = xEventGroupCreate();
+        if (ota_event_group == NULL) {
+            send_log_message(ESP_LOG_ERROR, TAG, "Failed to create event group");
+            OTA_FAIL_EXIT();
+        }
+    }
+
     // Create the OTA task and pass the ota_config
     xTaskCreate(&ota_task, "ota_task", 8192, &ota_config, 5, NULL);
 
