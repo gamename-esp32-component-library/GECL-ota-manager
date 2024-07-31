@@ -9,6 +9,7 @@
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
+#include "freertos/timers.h"
 #include "gecl-logger-manager.h"
 #include "gecl-misc-util-manager.h"
 #include "gecl-mqtt-manager.h"
@@ -43,6 +44,25 @@ const int OTA_FAILED_BIT = BIT1;
     } while (0)
 
 char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
+
+// Define a timer handle
+static TimerHandle_t reboot_timer = NULL;
+
+// Reboot callback function
+void reboot_callback(TimerHandle_t xTimer) {
+    send_log_message(ESP_LOG_INFO, TAG, "Rebooting system...");
+    esp_restart();
+}
+
+// Function to schedule the reboot
+void schedule_reboot(int delay_ms) {
+    if (reboot_timer == NULL) {
+        // Create a one-shot timer
+        reboot_timer = xTimerCreate("reboot_timer", pdMS_TO_TICKS(delay_ms), pdFALSE, (void *)0, reboot_callback);
+    }
+    // Start the timer
+    xTimerStart(reboot_timer, 0);
+}
 
 // Helper function to handle NVS errors and close the handle
 static esp_err_t nvs_get_u32_safe(nvs_handle_t nvs_handle, const char *key, uint32_t *out_value) {
@@ -121,7 +141,7 @@ void ota_handler_task(void *pvParameter) {
     cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
         send_log_message(ESP_LOG_ERROR, TAG, "Failed to parse JSON string");
-        OTA_FAIL_EXIT();
+        vTaskDelete(NULL);
     }
 
     char mac_address[18];
@@ -133,7 +153,7 @@ void ota_handler_task(void *pvParameter) {
     if (!host_key || !host_key_value) {
         send_log_message(ESP_LOG_ERROR, TAG, "Invalid or missing '%s' key in JSON", mac_address);
         cJSON_Delete(json);
-        OTA_FAIL_EXIT();
+        vTaskDelete(NULL);
     }
 
     char url_buffer[MAX_URL_LENGTH];
@@ -156,61 +176,74 @@ void ota_handler_task(void *pvParameter) {
         .http_config = &config,
     };
 
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    if (!update_partition) {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to find update partition");
+        vTaskDelete(NULL);
+    }
+
+    send_log_message(ESP_LOG_INFO, TAG, "OTA update partition: %s", update_partition->label);
+
     // Ensure the event group is created
     if (ota_event_group == NULL) {
         ota_event_group = xEventGroupCreate();
         if (ota_event_group == NULL) {
             send_log_message(ESP_LOG_ERROR, TAG, "Failed to create event group");
-            OTA_FAIL_EXIT();
+            vTaskDelete(NULL);
         }
     }
 
-    // Create the OTA task and pass the ota_config
-    xTaskCreate(&ota_task, "ota_task", 8192, &ota_config, 5, NULL);
-
-    // Wait for OTA completion
-    EventBits_t bits =
-        xEventGroupWaitBits(ota_event_group, OTA_COMPLETE_BIT | OTA_FAILED_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
-
-    if (bits & OTA_COMPLETE_BIT) {
-        // Reboot the system
-        esp_restart();
-    } else if (bits & OTA_FAILED_BIT) {
-        // Handle OTA failure
-        send_log_message(ESP_LOG_ERROR, TAG, "OTA FAILED");
+    // Initialize OTA
+    esp_https_ota_handle_t ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
+    if (err != ESP_OK) {
+        send_log_message(ESP_LOG_ERROR, TAG, "Failed to start OTA: %s", esp_err_to_name(err));
+        vTaskDelete(NULL);
     }
 
+    const int max_retries = 3;
+    int attempt = 0;
+    while (attempt < max_retries) {
+        // Create the OTA task and pass the ota_handle
+        xTaskCreate(&ota_task, "ota_task", 8192, ota_handle, 5, NULL);
+
+        // Wait for OTA completion
+        EventBits_t bits =
+            xEventGroupWaitBits(ota_event_group, OTA_COMPLETE_BIT | OTA_FAILED_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+
+        if (bits & OTA_COMPLETE_BIT) {
+            send_log_message(ESP_LOG_WARN, TAG, "OTA handler shows copy successful");
+            break;
+        } else if (bits & OTA_FAILED_BIT) {
+            // Handle OTA failure
+            send_log_message(ESP_LOG_ERROR, TAG, "OTA attempt %d failed", attempt + 1);
+            attempt++;
+            if (attempt < max_retries) {
+                send_log_message(ESP_LOG_INFO, TAG, "Retrying OTA...");
+            } else {
+                send_log_message(ESP_LOG_ERROR, TAG, "Max OTA attempts reached. OTA FAILED");
+                break;
+            }
+        }
+    }
+    send_log_message(ESP_LOG_INFO, TAG, "Scheduling reboot...");
+    schedule_reboot(1000);  // Schedule a reboot with a 1 second delay
     // Delete the handler task
     vTaskDelete(NULL);
 }
 
 void ota_task(void *pvParameter) {
-    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
+    send_log_message(ESP_LOG_INFO, TAG, "Starting main OTA task");
 
-    esp_https_ota_config_t *ota_config = (esp_https_ota_config_t *)pvParameter;
+    esp_https_ota_handle_t ota_handle = (esp_https_ota_handle_t)pvParameter;
 
     esp_task_wdt_add(NULL);
 
-    esp_https_ota_handle_t ota_handle = NULL;
-    esp_err_t err = esp_https_ota_begin(ota_config, &ota_handle);
-    if (err != ESP_OK) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to start OTA: %s", esp_err_to_name(err));
-        OTA_FAIL_EXIT();
-    }
-
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    if (!update_partition) {
-        send_log_message(ESP_LOG_ERROR, TAG, "Failed to find update partition");
-        OTA_FAIL_EXIT();
-    }
-
-    send_log_message(ESP_LOG_INFO, TAG, "OTA update partition: %s", update_partition->label);
-
     while (1) {
-        err = esp_https_ota_perform(ota_handle);
+        esp_err_t err = esp_https_ota_perform(ota_handle);
         if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            esp_task_wdt_reset();
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            // Continue downloading OTA update
+            vTaskDelay(pdMS_TO_TICKS(100));  // Add a delay to avoid busy-waiting
             continue;
         } else if (err != ESP_OK) {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
