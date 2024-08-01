@@ -226,17 +226,20 @@ void ota_handler_task(void *pvParameter) {
             }
         }
     }
-    send_log_message(ESP_LOG_INFO, TAG, "Scheduling reboot...");
+
+    // Schedule a reboot after OTA attempts
     schedule_reboot(1000);  // Schedule a reboot with a 1 second delay
+
     // Delete the handler task
     vTaskDelete(NULL);
 }
 
 void ota_task(void *pvParameter) {
-    send_log_message(ESP_LOG_INFO, TAG, "Starting main OTA task");
+    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
 
     esp_https_ota_handle_t ota_handle = (esp_https_ota_handle_t)pvParameter;
 
+    // Add the task to the watchdog
     esp_task_wdt_add(NULL);
 
     while (1) {
@@ -244,6 +247,8 @@ void ota_task(void *pvParameter) {
         if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
             // Continue downloading OTA update
             vTaskDelay(pdMS_TO_TICKS(100));  // Add a delay to avoid busy-waiting
+            // Reset the watchdog timer
+            esp_task_wdt_reset();
             continue;
         } else if (err != ESP_OK) {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA perform error: %s", esp_err_to_name(err));
@@ -266,4 +271,7 @@ void ota_task(void *pvParameter) {
         send_log_message(ESP_LOG_ERROR, TAG, "Complete data was not received.");
         OTA_FAIL_EXIT();
     }
+
+    // Remove the task from the watchdog
+    esp_task_wdt_delete(NULL);
 }
