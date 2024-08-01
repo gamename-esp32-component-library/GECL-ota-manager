@@ -43,8 +43,6 @@ const int OTA_FAILED_BIT = BIT1;
         vTaskDelete(NULL);                                     \
     } while (0)
 
-char ota_progress_buffer[OTA_PROGRESS_MESSAGE_LENGTH];
-
 // Define a timer handle
 static TimerHandle_t reboot_timer = NULL;
 
@@ -62,76 +60,6 @@ void schedule_reboot(int delay_ms) {
     }
     // Start the timer
     xTimerStart(reboot_timer, 0);
-}
-
-// Helper function to handle NVS errors and close the handle
-static esp_err_t nvs_get_u32_safe(nvs_handle_t nvs_handle, const char *key, uint32_t *out_value) {
-    esp_err_t err = nvs_get_u32(nvs_handle, key, out_value);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGE(TAG, "Failed to get value for %s: %s", key, esp_err_to_name(err));
-    }
-    return err;
-}
-
-// Check if the system was booted after an OTA update
-bool was_booted_after_ota_update(void) {
-    esp_reset_reason_t reset_reason = esp_reset_reason();
-    if (reset_reason != ESP_RST_SW) {
-        return false;
-    }
-
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to open NVS handle: %s", esp_err_to_name(err));
-        return false;
-    }
-
-    const esp_partition_t *running_partition = esp_ota_get_running_partition();
-    const esp_partition_t *boot_partition = esp_ota_get_boot_partition();
-
-    if (!running_partition || !boot_partition) {
-        ESP_LOGE(TAG, "Failed to get partition information.");
-        nvs_close(nvs_handle);
-        return false;
-    }
-
-    uint32_t saved_boot_part_addr = 0;
-    err = nvs_get_u32_safe(nvs_handle, "boot_part", &saved_boot_part_addr);
-    if (err == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGI(TAG, "No saved boot partition address found. Saving current boot partition.");
-        err = nvs_set_u32(nvs_handle, "boot_part", boot_partition->address);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to save boot partition address: %s", esp_err_to_name(err));
-        }
-        nvs_commit(nvs_handle);
-        nvs_close(nvs_handle);
-        return true;
-    } else if (err != ESP_OK) {
-        nvs_close(nvs_handle);
-        return false;
-    }
-
-    bool is_ota_update = (boot_partition->address != saved_boot_part_addr);
-    if (is_ota_update) {
-        ESP_LOGI(TAG, "OTA update detected.");
-        err = nvs_set_u32(nvs_handle, "boot_part", boot_partition->address);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to save boot partition address: %s", esp_err_to_name(err));
-        }
-        nvs_commit(nvs_handle);
-    } else {
-        ESP_LOGI(TAG, "No OTA update detected.");
-    }
-
-    nvs_close(nvs_handle);
-    return is_ota_update;
-}
-
-// Convert seconds into minutes and seconds
-void convert_seconds(int totalSeconds, int *minutes, int *seconds) {
-    *minutes = totalSeconds / 60;
-    *seconds = totalSeconds % 60;
 }
 
 void ota_handler_task(void *pvParameter) {
