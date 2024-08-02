@@ -19,7 +19,6 @@ idf_component_register(
         mqtt 
         json 
         gecl-logger-manager 
-        gecl-rgb-led-manager 
         gecl-mqtt-manager
         gecl-misc-util-manager
         gecl-heartbeat-manager

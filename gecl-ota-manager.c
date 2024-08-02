@@ -13,7 +13,6 @@
 #include "gecl-logger-manager.h"
 #include "gecl-misc-util-manager.h"
 #include "gecl-mqtt-manager.h"
-#include "gecl-rgb-led-manager.h"
 #include "sdkconfig.h"
 
 extern const uint8_t AmazonRootCA1_pem[];
