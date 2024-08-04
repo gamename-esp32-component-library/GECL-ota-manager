@@ -115,15 +115,23 @@ void ota_handler_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
+    payload_data = malloc(mqtt_event->data_len + 1);
+    strncpy(payload_data, mqtt_event->data, mqtt_event->data_len);
+    payload_data[mqtt_event->data_len] = '\0';
+
     send_log_message(ESP_LOG_INFO, TAG, "Starting OTA handler task");
 
     send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
 
-    cJSON *json = cJSON_Parse(mqtt_event->data);
+    send_log_message(ESP_LOG_INFO, TAG, "Payload data: %s", payload_data);
+
+    cJSON *json = cJSON_Parse(payload_data);
     if (!json) {
         send_log_message(ESP_LOG_ERROR, TAG, "Failed to parse JSON string");
         vTaskDelete(NULL);
     }
+
+    free(payload_data);
 
     char mac_address[18];
     get_burned_in_mac_address(mac_address);
