@@ -115,6 +115,10 @@ void ota_handler_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
+    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA handler task");
+
+    send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
+
     cJSON *json = cJSON_Parse(mqtt_event->data);
     if (!json) {
         send_log_message(ESP_LOG_ERROR, TAG, "Failed to parse JSON string");
