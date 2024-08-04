@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 #include <mbedtls/sha256.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -13,6 +14,8 @@
 #include "gecl-logger-manager.h"
 #include "gecl-misc-util-manager.h"
 #include "gecl-mqtt-manager.h"
+#include "nvs.h"
+#include "nvs_flash.h"
 #include "sdkconfig.h"
 
 extern const uint8_t AmazonRootCA1_pem[];
@@ -59,6 +62,53 @@ void schedule_reboot(int delay_ms) {
     }
     // Start the timer
     xTimerStart(reboot_timer, 0);
+}
+
+// Function to get the current local timestamp
+void get_current_timestamp(char *buffer, size_t max_len) {
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    strftime(buffer, max_len, "%Y-%m-%d_%H_%M_%S", &timeinfo);
+}
+
+// Function to write the OTA timestamp to NVS
+esp_err_t write_ota_timestamp_to_nvs(const char *timestamp) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    // Initialize NVS
+    err = nvs_flash_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize NVS: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Open NVS handle
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Write the timestamp to NVS
+    err = nvs_set_str(nvs_handle, "ota_timestamp", timestamp);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write timestamp to NVS: %s", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
+    }
+
+    // Commit the write
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit to NVS: %s", esp_err_to_name(err));
+    }
+
+    // Close NVS handle
+    nvs_close(nvs_handle);
+    return err;
 }
 
 void ota_handler_task(void *pvParameter) {
@@ -189,6 +239,20 @@ void ota_task(void *pvParameter) {
         esp_err_t ota_finish_err = esp_https_ota_finish(ota_handle);
         if (ota_finish_err == ESP_OK) {
             send_log_message(ESP_LOG_INFO, TAG, "Success - OTA update complete!");
+
+            // Get the current timestamp
+            char timestamp[20];
+            get_current_timestamp(timestamp, sizeof(timestamp));
+
+            // Write the timestamp to NVS
+            esp_err_t nvs_err = write_ota_timestamp_to_nvs(timestamp);
+            if (nvs_err != ESP_OK) {
+                send_log_message(ESP_LOG_ERROR, TAG, "Failed to write OTA timestamp to NVS: %s",
+                                 esp_err_to_name(nvs_err));
+                OTA_FAIL_EXIT();
+            }
+            send_log_message(ESP_LOG_INFO, TAG, "OTA timestamp written to NVS: %s", timestamp);
+
             OTA_COMPLETE_EXIT();
         } else {
             send_log_message(ESP_LOG_ERROR, TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
