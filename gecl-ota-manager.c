@@ -121,7 +121,7 @@ void ota_handler_task(void *pvParameter) {
 
     send_log_message(ESP_LOG_INFO, TAG, "Starting OTA handler task");
 
-    send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
+    // send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
 
     send_log_message(ESP_LOG_INFO, TAG, "Payload data: %s", payload_data);
 
