@@ -115,7 +115,7 @@ void ota_handler_task(void *pvParameter) {
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
-    payload_data = malloc(mqtt_event->data_len + 1);
+    char *payload_data = malloc(mqtt_event->data_len + 1);
     strncpy(payload_data, mqtt_event->data, mqtt_event->data_len);
     payload_data[mqtt_event->data_len] = '\0';
 
