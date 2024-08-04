@@ -204,8 +204,14 @@ void ota_handler_task(void *pvParameter) {
         }
     }
 
+    // Stop MQTT client
+    esp_mqtt_client_stop(my_mqtt_client);
+
+    // Disconnect WiFi
+    esp_wifi_disconnect();
+
     // Schedule a reboot after OTA attempts
-    schedule_reboot(1000);  // Schedule a reboot with a 1 second delay
+    schedule_reboot(1000);  // Schedule a reboot with a 1-second delay
 
     // Delete the handler task
     vTaskDelete(NULL);
