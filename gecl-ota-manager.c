@@ -121,7 +121,8 @@ void ota_handler_task(void *pvParameter) {
     strncpy(payload_data, mqtt_event->data, mqtt_event->data_len);
     payload_data[mqtt_event->data_len] = '\0';
 
-    send_log_message(ESP_LOG_INFO, TAG, "Payload data length: %d", mqtt_event->data_len);
+    send_log_message(ESP_LOG_INFO, TAG, "Lengths - Original: %d Payload: %d", mqtt_event->data_len,
+                     strlen(payload_data));
 
     // send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
 
