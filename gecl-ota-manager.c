@@ -233,7 +233,7 @@ void ota_handler_task(void *pvParameter) {
 }
 
 void ota_task(void *pvParameter) {
-    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
+    // send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
 
     esp_https_ota_handle_t ota_handle = (esp_https_ota_handle_t)pvParameter;
 
@@ -272,7 +272,7 @@ void ota_task(void *pvParameter) {
                                  esp_err_to_name(nvs_err));
                 OTA_FAIL_EXIT();
             }
-            send_log_message(ESP_LOG_INFO, TAG, "OTA timestamp written to NVS: %s", timestamp);
+            // send_log_message(ESP_LOG_INFO, TAG, "OTA timestamp written to NVS: %s", timestamp);
 
             OTA_COMPLETE_EXIT();
         } else {
