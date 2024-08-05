@@ -245,7 +245,7 @@ void ota_handler_task(void *pvParameter) {
     esp_wifi_disconnect();
 
     // Schedule a reboot after OTA attempts
-    schedule_reboot(1000);  // Schedule a reboot with a 1-second delay
+    schedule_reboot(10000);  // Schedule a reboot with a 10-second delay
 
     // Delete the handler task
     vTaskDelete(NULL);
