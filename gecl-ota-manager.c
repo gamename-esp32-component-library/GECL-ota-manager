@@ -112,6 +112,8 @@ esp_err_t write_ota_timestamp_to_nvs(const char *timestamp) {
 }
 
 void ota_handler_task(void *pvParameter) {
+    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA handler task");
+
     esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
     esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
 
@@ -119,7 +121,7 @@ void ota_handler_task(void *pvParameter) {
     strncpy(payload_data, mqtt_event->data, mqtt_event->data_len);
     payload_data[mqtt_event->data_len] = '\0';
 
-    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA handler task");
+    send_log_message(ESP_LOG_INFO, TAG, "Payload data length: %d", mqtt_event->data_len);
 
     // send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
 
