@@ -70,7 +70,7 @@ void get_current_timestamp(char *buffer, size_t max_len) {
     struct tm timeinfo;
     time(&now);
     localtime_r(&now, &timeinfo);
-    strftime(buffer, max_len, "%Y-%m-%d_%H_%M_%S", &timeinfo);
+    strftime(buffer, max_len, "%Y-%m-%d_%H-%M-%S", &timeinfo);
 }
 
 // Function to write the OTA timestamp to NVS
