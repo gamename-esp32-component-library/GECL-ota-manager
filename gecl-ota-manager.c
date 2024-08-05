@@ -47,11 +47,21 @@ const int OTA_FAILED_BIT = BIT1;
 
 // Define a timer handle
 static TimerHandle_t reboot_timer = NULL;
+static TimerHandle_t ota_timeout_timer = NULL;
+
+// Timeout period for OTA task (15 minutes in milliseconds)
+#define OTA_TIMEOUT_PERIOD (CONFIG_GECL_OTA_TIMEOUT_MINUTES * 60 * 1000)
 
 // Reboot callback function
 void reboot_callback(TimerHandle_t xTimer) {
     send_log_message(ESP_LOG_INFO, TAG, "Rebooting system...");
     esp_restart();
+}
+
+// OTA timeout callback function
+void ota_timeout_callback(TimerHandle_t xTimer) {
+    send_log_message(ESP_LOG_ERROR, TAG, "OTA task timed out. Aborting...");
+    OTA_FAIL_EXIT();
 }
 
 // Function to schedule the reboot
@@ -62,6 +72,17 @@ void schedule_reboot(int delay_ms) {
     }
     // Start the timer
     xTimerStart(reboot_timer, 0);
+}
+
+// Function to schedule the OTA timeout
+void schedule_ota_timeout(int timeout_ms) {
+    if (ota_timeout_timer == NULL) {
+        // Create a one-shot timer
+        ota_timeout_timer =
+            xTimerCreate("ota_timeout_timer", pdMS_TO_TICKS(timeout_ms), pdFALSE, (void *)0, ota_timeout_callback);
+    }
+    // Start the timer
+    xTimerStart(ota_timeout_timer, 0);
 }
 
 // Function to get the current local timestamp
@@ -123,8 +144,6 @@ void ota_handler_task(void *pvParameter) {
 
     send_log_message(ESP_LOG_INFO, TAG, "Lengths - Original: %d Payload: %d", mqtt_event->data_len,
                      strlen(payload_data));
-
-    // send_log_message(ESP_LOG_INFO, TAG, "Received OTA message: %s", mqtt_event->data);
 
     send_log_message(ESP_LOG_INFO, TAG, "Payload data: %s", payload_data);
 
@@ -197,7 +216,7 @@ void ota_handler_task(void *pvParameter) {
     int attempt = 0;
     while (attempt < max_retries) {
         // Create the OTA task and pass the ota_handle
-        xTaskCreate(&ota_task, "ota_task", 8192, ota_handle, 5, NULL);
+        xTaskCreate(&ota_task, "ota_task", 8192, ota_handle, 10, NULL);
 
         // Wait for OTA completion
         EventBits_t bits =
@@ -233,12 +252,15 @@ void ota_handler_task(void *pvParameter) {
 }
 
 void ota_task(void *pvParameter) {
-    // send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
+    send_log_message(ESP_LOG_INFO, TAG, "Starting OTA task");
 
     esp_https_ota_handle_t ota_handle = (esp_https_ota_handle_t)pvParameter;
 
     // Add the task to the watchdog
     esp_task_wdt_add(NULL);
+
+    // Schedule the OTA timeout
+    schedule_ota_timeout(OTA_TIMEOUT_PERIOD);
 
     while (1) {
         esp_err_t err = esp_https_ota_perform(ota_handle);
@@ -272,7 +294,7 @@ void ota_task(void *pvParameter) {
                                  esp_err_to_name(nvs_err));
                 OTA_FAIL_EXIT();
             }
-            // send_log_message(ESP_LOG_INFO, TAG, "OTA timestamp written to NVS: %s", timestamp);
+            send_log_message(ESP_LOG_INFO, TAG, "OTA timestamp written to NVS: %s", timestamp);
 
             OTA_COMPLETE_EXIT();
         } else {

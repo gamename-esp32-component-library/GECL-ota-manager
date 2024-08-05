@@ -5,5 +5,11 @@ menu "GECL OTA Manager Configuration"
         default y
         help
             Enable or disable the OTA Manager component.
+    
+    config GECL_OTA_TIMEOUT_MINUTES
+        int "OTA Timeout (minutes)"
+        default 15
+        help
+            Timeout in minutes for OTA operations.
 endmenu
     
