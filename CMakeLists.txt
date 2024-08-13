@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 idf_component_register(
     SRCS 
         "gecl-ota-manager.c" 
+        "AmazonRootCA1_pem.c"
     INCLUDE_DIRS 
         "include" 
     PRIV_REQUIRES 
