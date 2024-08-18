@@ -1,5 +1,15 @@
 {
-    "files.associations": {
-        "inttypes.h": "c"
-    }
+    "editor.formatOnSave": true,
+    "clang-format.style": "{ BasedOnStyle: LLVM, IndentWidth: 4, ColumnLimit: 120 }",
+    "idf.adapterTargetName": "esp32c3",
+    "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json",
+    "terminal.integrated.profiles.osx": {
+        "MyCustomProfile": {
+            "path": "/bin/zsh",
+            "args": [
+                "-c",
+                "source ~/.zshrc && setidf && export COMPONENT_KCONFIGS_DIR=$(pwd)/components && export EXTRA_COMPONENT_DIRS=$(pwd)/components && clear && exec zsh"
+            ]
+        }
+    },
 }
