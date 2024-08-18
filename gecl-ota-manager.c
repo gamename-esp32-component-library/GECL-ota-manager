@@ -236,7 +236,7 @@ void ota_handler_task(void *pvParameter) {
             xEventGroupWaitBits(ota_event_group, OTA_COMPLETE_BIT | OTA_FAILED_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
 
         if (bits & OTA_COMPLETE_BIT) {
-            send_log_message(ESP_LOG_WARN, TAG, "OTA handler shows copy successful");
+            ESP_LOGW(TAG, "OTA handler shows copy successful");
             break;
         } else if (bits & OTA_FAILED_BIT) {
             // Handle OTA failure
