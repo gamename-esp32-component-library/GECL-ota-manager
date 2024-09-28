@@ -210,7 +210,6 @@ esp_err_t write_ota_timestamp_to_nvs(const char *timestamp)
  */
 void ota_handler_task(void *pvParameter)
 {
-
     esp_log_level_set("*", ESP_LOG_INFO);   // Set global logging level to Info
     esp_log_level_set("OTA", ESP_LOG_INFO); // Set logging level for the "OTA" tag
 
