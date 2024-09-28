@@ -242,6 +242,15 @@ void ota_handler_task(void *pvParameter)
         }
     }
 
+    // Initialize OTA
+    esp_https_ota_handle_t ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start OTA: %s", esp_err_to_name(err));
+        vTaskDelete(NULL);
+    }
+
     // Create the OTA task and pass the ota_handle
     xTaskCreate(&ota_task, "ota_task", 8192, ota_handle, 10, NULL);
 
