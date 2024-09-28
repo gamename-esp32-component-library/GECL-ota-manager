@@ -77,6 +77,9 @@ static TimerHandle_t ota_timeout_timer = NULL;
 // Timeout period for OTA task (defined in configuration, in milliseconds)
 #define OTA_TIMEOUT_PERIOD (CONFIG_GECL_OTA_TIMEOUT_MINUTES * 60 * 1000)
 
+esp_log_level_set("*", ESP_LOG_INFO);   // Set global logging level to Info
+esp_log_level_set("OTA", ESP_LOG_INFO); // Set logging level for the "OTA" tag
+
 /**
  * Retrieves the MAC address burned into the ESP32 and formats it as a string.
  * This MAC address is used as a unique identifier during the OTA process.
