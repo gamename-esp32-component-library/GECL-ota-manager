@@ -320,7 +320,7 @@ void ota_handler_task(void *pvParameter)
 
     // Start the OTA task to handle the actual firmware download
     xTaskCreate(&ota_task, "ota_task", 8192, &ota_handle, 10, &ota_task_handle);
-    ConfigASSERT(ota_task_handle);
+    configASSERT(ota_task_handle);
 
     // Retry logic for the OTA process
     const int max_retries = 3;
