@@ -210,8 +210,10 @@ esp_err_t write_ota_timestamp_to_nvs(const char *timestamp)
  */
 void ota_handler_task(void *pvParameter)
 {
-    esp_log_level_set("*", ESP_LOG_INFO);   // Set global logging level to Info
-    esp_log_level_set("OTA", ESP_LOG_INFO); // Set logging level for the "OTA" tag
+    esp_log_level_set("*", ESP_LOG_DEBUG);   // Set global logging level to Info
+    esp_log_level_set("OTA", ESP_LOG_DEBUG); // Set logging level for the "OTA" tag
+    esp_log_level_set("esp_https_ota", ESP_LOG_DEBUG);
+    esp_log_level_set("esp_http_client", ESP_LOG_DEBUG);
 
     ESP_LOGI(TAG, "Starting OTA handler task");
 
