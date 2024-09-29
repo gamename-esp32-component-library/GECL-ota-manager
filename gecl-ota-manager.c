@@ -132,6 +132,8 @@ void ota_task(void *pvParameter)
     ESP_LOGI(TAG, "Starting...");
 
     const char *ota_url = (const char *)pvParameter;
+    ESP_LOGI(TAG, "Using URL: %s", ota_url);
+
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
         .url = ota_url,
