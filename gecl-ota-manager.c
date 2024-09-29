@@ -99,7 +99,7 @@ void get_burned_in_mac_address(char *mac_str)
 
 void ota_task(void *pvParameter)
 {
-    ESP_LOGI(TAG, "Starting Advanced OTA example");
+    ESP_LOGI(TAG, "Starting...");
 
     const char *ota_url = (const char *)pvParameter;
     esp_err_t ota_finish_err = ESP_OK;
