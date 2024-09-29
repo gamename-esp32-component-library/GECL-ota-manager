@@ -101,10 +101,10 @@ void ota_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "Starting Advanced OTA example");
 
-    ota_url_config_t *ota_url = (ota_url_config_t *)pvParameter;
+    const char *ota_url = (const char *)pvParameter;
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
-        .url = ota_url->url,
+        .url = ota_url,
         .cert_pem = (char *)AmazonRootCA1_pem,
         .timeout_ms = 30000,
         .keep_alive_enable = true,
