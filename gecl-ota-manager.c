@@ -145,8 +145,8 @@ void ota_task(void *pvParameter)
     esp_https_ota_config_t ota_config = {
         .http_config = &_http_config,
         .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
-        .partial_http_download = true,
-        .max_http_request_size = MBEDTLS_SSL_IN_CONTENT_LEN,
+        .partial_http_download = false,
+        .max_http_request_size = 4096,
     };
 
     esp_https_ota_handle_t https_ota_handle = NULL;
