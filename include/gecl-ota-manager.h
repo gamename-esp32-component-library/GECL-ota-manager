@@ -15,7 +15,13 @@
 #include "freertos/task.h"
 #include "mqtt_client.h"
 #include "nvs_flash.h"
+#define MAX_OTA_URL_LENGTH 512
+
+struct ota_url_config_t
+{
+    char url[MAX_OTA_URL_LENGTH];
+    size_t url_len;
+};
 
 void ota_task(void *pvParameter);
-void ota_handler_task(void *pvParameter);
-#endif  // OTA_UPDATE_H
+#endif // OTA_UPDATE_H

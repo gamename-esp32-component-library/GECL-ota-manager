@@ -41,6 +41,7 @@ extern const uint8_t AmazonRootCA1_pem[];
 // Logging tag for OTA messages
 static const char *TAG = "OTA";
 
+#if 0
 // Event group for OTA task synchronization
 static EventGroupHandle_t ota_event_group = NULL;
 const int OTA_COMPLETE_BIT = BIT0; // OTA complete event bit
@@ -49,7 +50,6 @@ const int OTA_FAILED_BIT = BIT1;   // OTA failure event bit
 // Maximum retries for OTA process
 #define MAX_RETRIES 5
 #define LOG_PROGRESS_INTERVAL 100
-#define MAX_URL_LENGTH 512
 #define OTA_PROGRESS_MESSAGE_LENGTH 128
 
 // Macro to handle OTA failure, sets failure event bit, deletes watchdog task, and terminates OTA task
@@ -77,6 +77,8 @@ static TimerHandle_t ota_timeout_timer = NULL;
 // Timeout period for OTA task (defined in configuration, in milliseconds)
 #define OTA_TIMEOUT_PERIOD (CONFIG_GECL_OTA_TIMEOUT_MINUTES * 60 * 1000)
 
+#endif
+
 /**
  * Retrieves the MAC address burned into the ESP32 and formats it as a string.
  * This MAC address is used as a unique identifier during the OTA process.
@@ -95,6 +97,93 @@ void get_burned_in_mac_address(char *mac_str)
     }
 }
 
+void ota_task(void *pvParameter)
+{
+    ESP_LOGI(TAG, "Starting Advanced OTA example");
+
+    ota_url_config_t *ota_url = (ota_url_config_t *)pvParameter;
+    esp_err_t ota_finish_err = ESP_OK;
+    esp_http_client_config_t _http_config = {
+        .url = ota_url->url,
+        .cert_pem = (char *)AmazonRootCA1_pem,
+        .timeout_ms = 30000,
+        .keep_alive_enable = true,
+    };
+
+    esp_https_ota_config_t ota_config = {
+        .http_config = &_http_config,
+        .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
+        .partial_http_download = true,
+        .max_http_request_size = MBEDTLS_SSL_IN_CONTENT_LEN,
+    };
+
+    esp_https_ota_handle_t https_ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
+        vTaskDelete(NULL);
+    }
+
+    esp_app_desc_t app_desc;
+    err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "esp_https_ota_get_img_desc failed");
+        goto ota_end;
+    }
+    err = validate_image_header(&app_desc);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "image header verification failed");
+        goto ota_end;
+    }
+
+    while (1)
+    {
+        err = esp_https_ota_perform(https_ota_handle);
+        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS)
+        {
+            break;
+        }
+        // esp_https_ota_perform returns after every read operation which gives user the ability to
+        // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
+        // data read so far.
+        ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+    }
+
+    if (esp_https_ota_is_complete_data_received(https_ota_handle) != true)
+    {
+        // the OTA image was not completely received and user can customise the response to this situation.
+        ESP_LOGE(TAG, "Complete data was not received.");
+    }
+    else
+    {
+        ota_finish_err = esp_https_ota_finish(https_ota_handle);
+        if ((err == ESP_OK) && (ota_finish_err == ESP_OK))
+        {
+            ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            esp_restart();
+        }
+        else
+        {
+            if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED)
+            {
+                ESP_LOGE(TAG, "Image validation failed, image is corrupted");
+            }
+            ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
+            vTaskDelete(NULL);
+        }
+    }
+
+ota_end:
+    esp_https_ota_abort(https_ota_handle);
+    ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
+    vTaskDelete(NULL);
+}
+
+#if 0
 /**
  * Callback function to reboot the ESP32 device after a successful OTA update.
  * The device is restarted using the `esp_restart()` function.
@@ -269,7 +358,7 @@ void ota_handler_task(void *pvParameter)
     esp_http_client_config_t config = {
         .url = url_buffer,
         .cert_pem = (char *)AmazonRootCA1_pem, // Use the predefined Amazon Root CA certificate
-        .timeout_ms = 30000,                   // Set a 30-second timeout for the HTTPS client
+        .timeout_ms = 60000,                   // Set a 30-second timeout for the HTTPS client
     };
 
     cJSON_Delete(json);
@@ -459,3 +548,4 @@ void ota_task(void *pvParameter)
     ESP_LOGI(TAG, "Removing OTA task from watchdog timer");
     esp_task_wdt_delete(NULL);
 }
+#endif
