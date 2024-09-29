@@ -97,6 +97,36 @@ void get_burned_in_mac_address(char *mac_str)
     }
 }
 
+static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client)
+{
+    esp_err_t err = ESP_OK;
+    /* Uncomment to add custom headers to HTTP request */
+    // err = esp_http_client_set_header(http_client, "Custom-Header", "Value");
+    return err;
+}
+static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
+{
+    if (new_app_info == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_app_desc_t running_app_info;
+    if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Running firmware version: %s", running_app_info.version);
+    }
+
+    if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0)
+    {
+        ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
 void ota_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "Starting...");
