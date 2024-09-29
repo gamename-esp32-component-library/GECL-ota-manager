@@ -318,7 +318,7 @@ void ota_handler_task(void *pvParameter)
     }
     TaskHandle_t ota_task_handle = NULL;
 
-    ESP_LOGI(TAG, "Free heap size before task creation: %d", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free heap size before task creation: %lu", esp_get_free_heap_size());
 
     // Try reducing the stack size and check for task creation success
     if (xTaskCreate(&ota_task, "ota_task", 4096, &ota_handle, 10, &ota_task_handle) != pdPASS)
