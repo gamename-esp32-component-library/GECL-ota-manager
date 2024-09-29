@@ -318,8 +318,16 @@ void ota_handler_task(void *pvParameter)
     }
     TaskHandle_t ota_task_handle = NULL;
 
-    // Start the OTA task to handle the actual firmware download
-    xTaskCreate(&ota_task, "ota_task", 8192, &ota_handle, 10, &ota_task_handle);
+    ESP_LOGI(TAG, "Free heap size before task creation: %d", esp_get_free_heap_size());
+
+    // Try reducing the stack size and check for task creation success
+    if (xTaskCreate(&ota_task, "ota_task", 4096, &ota_handle, 10, &ota_task_handle) != pdPASS)
+    {
+        ESP_LOGE(TAG, "Failed to create OTA task.");
+        vTaskDelete(NULL); // Abort if task creation fails
+    }
+
+    // Assert to verify the task was created successfully
     configASSERT(ota_task_handle);
 
     // Retry logic for the OTA process
