@@ -316,9 +316,11 @@ void ota_handler_task(void *pvParameter)
     {
         ESP_LOGI(TAG, "OTA started successfully");
     }
+    TaskHandle_t ota_task_handle = NULL;
 
     // Start the OTA task to handle the actual firmware download
-    xTaskCreate(&ota_task, "ota_task", 8192, ota_handle, 10, NULL);
+    xTaskCreate(&ota_task, "ota_task", 8192, &ota_handle, 10, &ota_task_handle);
+    ConfigASSERT(ota_task_handle);
 
     // Retry logic for the OTA process
     const int max_retries = 3;
@@ -331,6 +333,10 @@ void ota_handler_task(void *pvParameter)
         if (bits & OTA_COMPLETE_BIT)
         {
             ESP_LOGW(TAG, "OTA handler reports firmware copy successful");
+            if (ota_task_handle != NULL)
+            {
+                vTaskDelete(ota_task_handle); // Delete the OTA task
+            }
             break;
         }
         else if (bits & OTA_FAILED_BIT)
