@@ -138,14 +138,14 @@ void ota_task(void *pvParameter)
     esp_http_client_config_t _http_config = {
         .url = ota_url,
         .cert_pem = (char *)AmazonRootCA1_pem,
-        .timeout_ms = 30000,
+        .timeout_ms = 120000,
         .keep_alive_enable = true,
     };
 
     esp_https_ota_config_t ota_config = {
         .http_config = &_http_config,
         .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
-        .partial_http_download = false,
+        .partial_http_download = true,
         .max_http_request_size = 4096,
     };
 
