@@ -1,3 +1,21 @@
+/*
+ * OTA Update Process for ESP32 Device
+ * ===================================
+ *
+ * This document outlines the process of Over-The-Air (OTA) firmware updates for an ESP32 device using
+ * ESP-IDF (Espressif IoT Development Framework). The OTA handler uses MQTT for message reception,
+ * HTTPS for secure firmware downloads, and NVS (Non-Volatile Storage) for tracking OTA update timestamps.
+ *
+ * Key Features:
+ * 1. OTA updates initiated via MQTT message.
+ * 2. HTTPS used for secure firmware download.
+ * 3. NVS used for storing update timestamps.
+ * 4. Timeouts and retry mechanisms ensure robust error handling.
+ * 5. Watchdog timers to prevent task hangs during the OTA process.
+ * 6. Automatic reboot after successful update.
+ *
+ */
+
 #include "gecl-ota-manager.h"
 
 #include <inttypes.h>
@@ -17,307 +35,219 @@
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
+// External Certificate Authority (CA) certificate for HTTPS connection to AWS S3
 extern const uint8_t AmazonRootCA1_pem[];
 
+// Logging tag for OTA messages
 static const char *TAG = "OTA";
 
-static EventGroupHandle_t ota_event_group;
-const int OTA_COMPLETE_BIT = BIT0;
-const int OTA_FAILED_BIT = BIT1;
-
-#define MAX_RETRIES 5
-#define LOG_PROGRESS_INTERVAL 100
-#define MAX_URL_LENGTH 512
-#define OTA_PROGRESS_MESSAGE_LENGTH 128
-
-#define OTA_FAIL_EXIT()                                                                                                \
-    do {                                                                                                               \
-        xEventGroupSetBits(ota_event_group, OTA_FAILED_BIT);                                                           \
-        esp_task_wdt_delete(NULL);                                                                                     \
-        vTaskDelete(NULL);                                                                                             \
-    } while (0)
-
-#define OTA_COMPLETE_EXIT()                                                                                            \
-    do {                                                                                                               \
-        xEventGroupSetBits(ota_event_group, OTA_COMPLETE_BIT);                                                         \
-        esp_task_wdt_delete(NULL);                                                                                     \
-        vTaskDelete(NULL);                                                                                             \
-    } while (0)
-
-// Define a timer handle
-static TimerHandle_t reboot_timer = NULL;
-static TimerHandle_t ota_timeout_timer = NULL;
-
-// Timeout period for OTA task (15 minutes in milliseconds)
-#define OTA_TIMEOUT_PERIOD (CONFIG_GECL_OTA_TIMEOUT_MINUTES * 60 * 1000)
-
-void get_burned_in_mac_address(char *mac_str) {
-    uint8_t mac[6];
-    esp_err_t ret = esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    if (ret == ESP_OK) {
-        snprintf(mac_str, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    } else {
-        snprintf(mac_str, 18, "ERROR");
-    }
-}
-
-// Reboot callback function
-void reboot_callback(TimerHandle_t xTimer) {
-    ESP_LOGI(TAG, "Rebooting system...");
-    esp_restart();
-}
-
-// OTA timeout callback function
-void ota_timeout_callback(TimerHandle_t xTimer) {
-    ESP_LOGE(TAG, "OTA task timed out. Aborting...");
-    OTA_FAIL_EXIT();
-}
-
-// Function to schedule the reboot
-void schedule_reboot(int delay_ms) {
-    if (reboot_timer == NULL) {
-        // Create a one-shot timer
-        reboot_timer = xTimerCreate("reboot_timer", pdMS_TO_TICKS(delay_ms), pdFALSE, (void *)0, reboot_callback);
-    }
-    // Start the timer
-    xTimerStart(reboot_timer, 0);
-}
-
-// Function to schedule the OTA timeout
-void schedule_ota_timeout(int timeout_ms) {
-    if (ota_timeout_timer == NULL) {
-        // Create a one-shot timer
-        ota_timeout_timer =
-            xTimerCreate("ota_timeout_timer", pdMS_TO_TICKS(timeout_ms), pdFALSE, (void *)0, ota_timeout_callback);
-    }
-    // Start the timer
-    xTimerStart(ota_timeout_timer, 0);
-}
-
-// Function to get the current local timestamp
-void get_current_timestamp(char *buffer, size_t max_len) {
+/**
+ * Retrieves the current local timestamp and formats it as a string.
+ * This is used for logging and storing the OTA update time.
+ */
+void get_current_timestamp(char *buffer, size_t max_len)
+{
     time_t now;
     struct tm timeinfo;
     time(&now);
-    localtime_r(&now, &timeinfo);
-    strftime(buffer, max_len, "%Y-%m-%d_%H-%M-%S", &timeinfo);
+    localtime_r(&now, &timeinfo);                              // Convert to local time
+    strftime(buffer, max_len, "%Y-%m-%d_%H-%M-%S", &timeinfo); // Format the timestamp
 }
 
-// Function to write the OTA timestamp to NVS
-esp_err_t write_ota_timestamp_to_nvs(const char *timestamp) {
+/**
+ * Writes the OTA update timestamp to NVS (Non-Volatile Storage).
+ * This allows the device to track when the last successful OTA update occurred.
+ */
+esp_err_t write_ota_timestamp_to_nvs(const char *timestamp)
+{
     nvs_handle_t nvs_handle;
     esp_err_t err;
 
-    // Initialize NVS
+    // Initialize NVS (if not already initialized)
     err = nvs_flash_init();
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to initialize NVS: %s", esp_err_to_name(err));
         return err;
     }
 
-    // Open NVS handle
+    // Open the NVS handle for writing
     err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
         return err;
     }
 
-    // Write the timestamp to NVS
+    // Write the OTA timestamp to NVS
     err = nvs_set_str(nvs_handle, "ota_timestamp", timestamp);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to write timestamp to NVS: %s", esp_err_to_name(err));
         nvs_close(nvs_handle);
         return err;
     }
 
-    // Commit the write
+    // Commit the changes to NVS
     err = nvs_commit(nvs_handle);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to commit to NVS: %s", esp_err_to_name(err));
     }
 
-    // Close NVS handle
+    // Close the NVS handle
     nvs_close(nvs_handle);
     return err;
 }
 
-void ota_handler_task(void *pvParameter) {
-    ESP_LOGI(TAG, "Starting OTA handler task");
-
-    esp_mqtt_event_handle_t mqtt_event = (esp_mqtt_event_handle_t)pvParameter;
-    esp_mqtt_client_handle_t my_mqtt_client = mqtt_event->client;
-
-    if (mqtt_event->data_len == 0) {
-        ESP_LOGE(TAG, "Empty payload received! Aborting OTA...");
-        vTaskDelete(NULL);
+/**
+ * Retrieves the MAC address burned into the ESP32 and formats it as a string.
+ * This MAC address is used as a unique identifier during the OTA process.
+ */
+void get_burned_in_mac_address(char *mac_str)
+{
+    uint8_t mac[6];
+    esp_err_t ret = esp_read_mac(mac, ESP_MAC_WIFI_STA); // Read the station MAC address
+    if (ret == ESP_OK)
+    {
+        snprintf(mac_str, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }
-
-    char *payload_data = malloc(mqtt_event->data_len + 1);
-    strncpy(payload_data, mqtt_event->data, mqtt_event->data_len);
-    payload_data[mqtt_event->data_len] = '\0';
-
-    ESP_LOGI(TAG, "Lengths - Original: %d Payload: %d", mqtt_event->data_len, strlen(payload_data));
-
-    ESP_LOGI(TAG, "Payload data: %s", payload_data);
-
-    cJSON *json = cJSON_Parse(payload_data);
-    if (!json) {
-        ESP_LOGE(TAG, "Failed to parse JSON string");
-        vTaskDelete(NULL);
+    else
+    {
+        snprintf(mac_str, 18, "ERROR");
     }
-
-    free(payload_data);
-
-    char mac_address[18];
-    get_burned_in_mac_address(mac_address);
-    ESP_LOGI(TAG, "Burned-In MAC Address: %s\n", mac_address);
-
-    cJSON *host_key = cJSON_GetObjectItem(json, mac_address);
-    const char *host_key_value = cJSON_GetStringValue(host_key);
-    if (!host_key || !host_key_value) {
-        ESP_LOGE(TAG, "Invalid or missing '%s' key in JSON", mac_address);
-        cJSON_Delete(json);
-        vTaskDelete(NULL);
-    }
-
-    char url_buffer[MAX_URL_LENGTH];
-    strncpy(url_buffer, host_key_value, MAX_URL_LENGTH - 1);
-    url_buffer[MAX_URL_LENGTH - 1] = '\0';
-
-    ESP_LOGI(TAG, "Host key value: %s", url_buffer);
-
-    esp_http_client_config_t config = {
-        .url = url_buffer,
-        .cert_pem = (char *)AmazonRootCA1_pem,
-        .timeout_ms = 30000,
-    };
-
-    cJSON_Delete(json);
-
-    ESP_LOGI(TAG, "Starting OTA with URL: %s", config.url);
-
-    esp_https_ota_config_t ota_config = {
-        .http_config = &config,
-    };
-
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    if (!update_partition) {
-        ESP_LOGE(TAG, "Failed to find update partition");
-        vTaskDelete(NULL);
-    }
-
-    ESP_LOGI(TAG, "OTA update partition: %s", update_partition->label);
-
-    // Ensure the event group is created
-    if (ota_event_group == NULL) {
-        ota_event_group = xEventGroupCreate();
-        if (ota_event_group == NULL) {
-            ESP_LOGE(TAG, "Failed to create event group");
-            vTaskDelete(NULL);
-        }
-    }
-
-    // Initialize OTA
-    esp_https_ota_handle_t ota_handle = NULL;
-    esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start OTA: %s", esp_err_to_name(err));
-        vTaskDelete(NULL);
-    }
-
-    const int max_retries = 3;
-    int attempt = 0;
-    while (attempt < max_retries) {
-        // Create the OTA task and pass the ota_handle
-        xTaskCreate(&ota_task, "ota_task", 8192, ota_handle, 10, NULL);
-
-        // Wait for OTA completion
-        EventBits_t bits =
-            xEventGroupWaitBits(ota_event_group, OTA_COMPLETE_BIT | OTA_FAILED_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
-
-        if (bits & OTA_COMPLETE_BIT) {
-            ESP_LOGW(TAG, "OTA handler shows copy successful");
-            break;
-        } else if (bits & OTA_FAILED_BIT) {
-            // Handle OTA failure
-            ESP_LOGE(TAG, "OTA attempt %d failed", attempt + 1);
-            attempt++;
-            if (attempt < max_retries) {
-                ESP_LOGI(TAG, "Retrying OTA...");
-            } else {
-                ESP_LOGE(TAG, "Max OTA attempts reached. OTA FAILED");
-                break;
-            }
-        }
-    }
-
-    // Stop MQTT client
-    esp_mqtt_client_stop(my_mqtt_client);
-
-    // Disconnect WiFi
-    esp_wifi_disconnect();
-
-    // Schedule a reboot after OTA attempts
-    schedule_reboot(10000); // Schedule a reboot with a 10-second delay
-
-    // Delete the handler task
-    vTaskDelete(NULL);
 }
 
-void ota_task(void *pvParameter) {
-    ESP_LOGI(TAG, "Starting OTA task");
-
-    esp_https_ota_handle_t ota_handle = (esp_https_ota_handle_t)pvParameter;
-
-    // Add the task to the watchdog
-    esp_task_wdt_add(NULL);
-
-    // Schedule the OTA timeout
-    schedule_ota_timeout(OTA_TIMEOUT_PERIOD);
-
-    while (1) {
-        esp_err_t err = esp_https_ota_perform(ota_handle);
-        if (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            // Continue downloading OTA update
-            vTaskDelay(pdMS_TO_TICKS(100)); // Add a delay to avoid busy-waiting
-            // Reset the watchdog timer
-            esp_task_wdt_reset();
-            continue;
-        } else if (err != ESP_OK) {
-            ESP_LOGE(TAG, "OTA perform error: %s", esp_err_to_name(err));
-            OTA_FAIL_EXIT();
-        } else {
-            break;
-        }
+static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client)
+{
+    esp_err_t err = ESP_OK;
+    /* Uncomment to add custom headers to HTTP request */
+    // err = esp_http_client_set_header(http_client, "Custom-Header", "Value");
+    return err;
+}
+static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
+{
+    if (new_app_info == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
     }
 
-    if (esp_https_ota_is_complete_data_received(ota_handle)) {
-        esp_err_t ota_finish_err = esp_https_ota_finish(ota_handle);
-        if (ota_finish_err == ESP_OK) {
-            ESP_LOGI(TAG, "Success - OTA update complete!");
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_app_desc_t running_app_info;
+    if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Running firmware version: %s", running_app_info.version);
+    }
 
+    if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0)
+    {
+        ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+void ota_task(void *pvParameter)
+{
+    ESP_LOGI(TAG, "Starting...");
+
+    const char *ota_url = (const char *)pvParameter;
+    ESP_LOGI(TAG, "Using URL: %s", ota_url);
+
+    esp_err_t ota_finish_err = ESP_OK;
+    esp_http_client_config_t _http_config = {
+        .url = ota_url,
+        .cert_pem = (char *)AmazonRootCA1_pem,
+        .timeout_ms = 120000,
+        .keep_alive_enable = true,
+    };
+
+    esp_https_ota_config_t ota_config = {
+        .http_config = &_http_config,
+        .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
+        .partial_http_download = true,
+        .max_http_request_size = 4096,
+    };
+
+    esp_https_ota_handle_t https_ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
+        vTaskDelete(NULL);
+    }
+
+    esp_app_desc_t app_desc;
+    err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "esp_https_ota_get_img_desc failed");
+        goto ota_end;
+    }
+    err = validate_image_header(&app_desc);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "image header verification failed");
+        goto ota_end;
+    }
+
+    while (1)
+    {
+        err = esp_https_ota_perform(https_ota_handle);
+        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS)
+        {
+            break;
+        }
+        // esp_https_ota_perform returns after every read operation which gives user the ability to
+        // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
+        // data read so far.
+        ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+    }
+
+    if (esp_https_ota_is_complete_data_received(https_ota_handle) != true)
+    {
+        // the OTA image was not completely received and user can customise the response to this situation.
+        ESP_LOGE(TAG, "Complete data was not received.");
+    }
+    else
+    {
+        ota_finish_err = esp_https_ota_finish(https_ota_handle);
+        if ((err == ESP_OK) && (ota_finish_err == ESP_OK))
+        {
+            ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful! Writing timestamp to NVS...");
             // Get the current timestamp
             char timestamp[20];
             get_current_timestamp(timestamp, sizeof(timestamp));
 
-            // Write the timestamp to NVS
+            // Write the OTA timestamp to NVS for tracking
             esp_err_t nvs_err = write_ota_timestamp_to_nvs(timestamp);
-            if (nvs_err != ESP_OK) {
+            if (nvs_err != ESP_OK)
+            {
                 ESP_LOGE(TAG, "Failed to write OTA timestamp to NVS: %s", esp_err_to_name(nvs_err));
-                OTA_FAIL_EXIT();
             }
-            ESP_LOGI(TAG, "OTA timestamp written to NVS: %s", timestamp);
+            else
+            {
+                ESP_LOGI(TAG, "timestamp written to NVS: %s", timestamp);
+            }
 
-            OTA_COMPLETE_EXIT();
-        } else {
-            ESP_LOGE(TAG, "OTA update failed: %s", esp_err_to_name(ota_finish_err));
-            OTA_FAIL_EXIT();
+            ESP_LOGI(TAG, "Rebooting ...");
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            esp_restart();
         }
-    } else {
-        ESP_LOGE(TAG, "Complete data was not received.");
-        OTA_FAIL_EXIT();
+        else
+        {
+            if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED)
+            {
+                ESP_LOGE(TAG, "Image validation failed, image is corrupted");
+            }
+            ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
+            vTaskDelete(NULL);
+        }
     }
 
-    // Remove the task from the watchdog
-    esp_task_wdt_delete(NULL);
+ota_end:
+    esp_https_ota_abort(https_ota_handle);
+    ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
+    vTaskDelete(NULL);
 }

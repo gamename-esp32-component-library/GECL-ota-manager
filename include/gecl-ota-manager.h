@@ -17,5 +17,4 @@
 #include "nvs_flash.h"
 
 void ota_task(void *pvParameter);
-void ota_handler_task(void *pvParameter);
-#endif  // OTA_UPDATE_H
+#endif // OTA_UPDATE_H
