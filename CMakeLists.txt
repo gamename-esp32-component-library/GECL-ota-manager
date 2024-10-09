@@ -20,7 +20,6 @@ idf_component_register(
         mqtt 
         json 
         gecl-mqtt-manager
-        gecl-misc-util-manager
         gecl-time-sync-manager
         lwip
     )
