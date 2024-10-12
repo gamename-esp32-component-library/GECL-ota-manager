@@ -192,7 +192,6 @@ void ota_task(void *pvParameter)
         goto ota_end;
     }
 
-    int iteration = 0;
     while (1)
     {
         err = esp_https_ota_perform(https_ota_handle);
@@ -204,15 +203,7 @@ void ota_task(void *pvParameter)
         // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
         // data read so far.
         // ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
-        if (iteration == 1000)
-        {
-            ESP_LOGI(TAG, "Bytes read so far: %d", esp_https_ota_get_image_len_read(https_ota_handle));
-            iteration = 0;
-        }
-        else
-        {
-            iteration++;
-        }
+        vTaskDelay(pdMS_TO_TICKS(100)); // Delay to allow other tasks to run
     }
 
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true)
