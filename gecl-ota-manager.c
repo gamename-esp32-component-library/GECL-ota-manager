@@ -208,6 +208,10 @@ void ota_task(void *pvParameter)
         {
             ESP_LOGI(TAG, "Bytes read so far: %d", esp_https_ota_get_image_len_read(https_ota_handle));
         }
+        else
+        {
+            iteration++;
+        }
     }
 
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true)
