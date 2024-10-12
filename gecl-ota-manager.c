@@ -202,13 +202,14 @@ void ota_task(void *pvParameter)
         // esp_https_ota_perform returns after every read operation which gives user the ability to
         // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
         // data read so far.
-        ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+        // ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
     }
 
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true)
     {
         // the OTA image was not completely received and user can customise the response to this situation.
         ESP_LOGE(TAG, "Complete data was not received.");
+        goto ota_end;
     }
     else
     {
@@ -225,6 +226,7 @@ void ota_task(void *pvParameter)
             if (nvs_err != ESP_OK)
             {
                 ESP_LOGE(TAG, "Failed to write OTA timestamp to NVS: %s", esp_err_to_name(nvs_err));
+                goto ota_end;
             }
             else
             {
@@ -242,12 +244,12 @@ void ota_task(void *pvParameter)
                 ESP_LOGE(TAG, "Image validation failed, image is corrupted");
             }
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            vTaskDelete(NULL);
+            goto ota_end;
         }
     }
 
 ota_end:
     esp_https_ota_abort(https_ota_handle);
     ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    vTaskDelete(NULL);
+    esp_restart();
 }
