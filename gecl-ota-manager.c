@@ -235,8 +235,12 @@ void ota_task(void *pvParameter)
             }
 
             ESP_LOGI(TAG, "Rebooting ...");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
+            esp_task_wdt_init(1, true); // Initialize watchdog with a 1-second timeout
+            esp_task_wdt_add(NULL);     // Add the current task to the watchdog
+            while (true)
+            {
+                // Block the task to trigger watchdog timeout
+            }
         }
         else
         {
