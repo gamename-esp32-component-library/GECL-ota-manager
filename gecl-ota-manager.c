@@ -148,7 +148,7 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 
     return ESP_OK;
 }
-void stop_mqtt(mqtt_client)
+void stop_mqtt(esp_mqtt_client_handle_t mqtt_client)
 {
     esp_err_t ret;
 
