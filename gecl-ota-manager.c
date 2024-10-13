@@ -148,9 +148,30 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 
     return ESP_OK;
 }
-void stop_wifi_and_restart()
+void stop_comms_and_restart()
 {
     esp_err_t ret;
+
+    ret = esp_mqtt_client_stop(mqtt_client);
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "MQTT client stopped successfully.");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to stop MQTT client: %s", esp_err_to_name(ret));
+    }
+
+    // Optionally destroy the MQTT client to free up resources
+    ret = esp_mqtt_client_destroy(mqtt_client);
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "MQTT client destroyed successfully.");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to destroy MQTT client: %s", esp_err_to_name(ret));
+    }
 
     // Stop Wi-Fi
     ret = esp_wifi_stop();
@@ -266,7 +287,7 @@ void ota_task(void *pvParameter)
 
             ESP_LOGI(TAG, "Rebooting ...");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            stop_wifi_and_restart();
+            stop_comms_and_restart();
         }
         else
         {
@@ -282,5 +303,5 @@ void ota_task(void *pvParameter)
 ota_end:
     esp_https_ota_abort(https_ota_handle);
     ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    stop_wifi_and_restart();
+    stop_comms_and_restart();
 }
