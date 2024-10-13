@@ -204,8 +204,8 @@ void ota_task(void *pvParameter)
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        vTaskDelete(NULL);
+        ESP_LOGE(TAG, "Begin failed");
+        goto ota_end;
     }
 
     esp_app_desc_t app_desc;
