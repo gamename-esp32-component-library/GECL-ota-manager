@@ -30,10 +30,11 @@
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "freertos/timers.h"
-#include "gecl-mqtt-manager.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
+#include "esp_wifi.h"
+#include "esp_system.h"
 
 // External Certificate Authority (CA) certificate for HTTPS connection to AWS S3
 extern const uint8_t AmazonRootCA1_pem[];
@@ -147,6 +148,35 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 
     return ESP_OK;
 }
+void stop_wifi_and_restart()
+{
+    esp_err_t ret;
+
+    // Stop Wi-Fi
+    ret = esp_wifi_stop();
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Wi-Fi stopped successfully.");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to stop Wi-Fi: %s", esp_err_to_name(ret));
+    }
+
+    // Optionally deinitialize Wi-Fi
+    ret = esp_wifi_deinit();
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Wi-Fi deinitialized successfully.");
+    }
+    else
+    {
+        ESP_LOGE("Failed to deinitialize Wi-Fi: %s", esp_err_to_name(ret));
+    }
+
+    ESP_LOGI(TAG, "Now restart the ESP32");
+    esp_restart(); // Force a restart
+}
 
 void ota_task(void *pvParameter)
 {
@@ -235,12 +265,8 @@ void ota_task(void *pvParameter)
             }
 
             ESP_LOGI(TAG, "Rebooting ...");
-            esp_task_wdt_init(1, true); // Initialize watchdog with a 1-second timeout
-            esp_task_wdt_add(NULL);     // Add the current task to the watchdog
-            while (true)
-            {
-                // Block the task to trigger watchdog timeout
-            }
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            stop_wifi_and_restart();
         }
         else
         {
@@ -256,5 +282,5 @@ void ota_task(void *pvParameter)
 ota_end:
     esp_https_ota_abort(https_ota_handle);
     ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    esp_restart();
+    stop_wifi_and_restart();
 }
