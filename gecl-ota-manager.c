@@ -290,9 +290,10 @@ void ota_task(void *pvParameter)
                 ESP_LOGI(TAG, "timestamp written to NVS: %s", timestamp);
             }
 
-            ESP_LOGI(TAG, "Rebooting ...");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP_LOGI(TAG, "Stopping WiFi ...");
             stop_wifi();
+            ESP_LOGI(TAG, "Rebooting ...");
             esp_restart();
         }
         else
