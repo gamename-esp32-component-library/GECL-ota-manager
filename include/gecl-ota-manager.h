@@ -16,5 +16,11 @@
 #include "mqtt_client.h"
 #include "nvs_flash.h"
 
+typedef struct
+{
+    esp_mqtt_client_handle_t mqtt_client; // MQTT client handle
+    char url[512];                        // URL string (512 bytes)
+} ota_config_t;
+
 void ota_task(void *pvParameter);
 #endif // OTA_UPDATE_H

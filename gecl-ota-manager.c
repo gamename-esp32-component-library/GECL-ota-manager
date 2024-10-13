@@ -148,7 +148,7 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 
     return ESP_OK;
 }
-void stop_comms_and_restart()
+void stop_mqtt(mqtt_client)
 {
     esp_err_t ret;
 
@@ -172,6 +172,11 @@ void stop_comms_and_restart()
     {
         ESP_LOGE(TAG, "Failed to destroy MQTT client: %s", esp_err_to_name(ret));
     }
+}
+
+void stop_wifi()
+{
+    esp_err_t ret;
 
     // Stop Wi-Fi
     ret = esp_wifi_stop();
@@ -194,17 +199,17 @@ void stop_comms_and_restart()
     {
         ESP_LOGE(TAG, "Failed to deinitialize Wi-Fi: %s", esp_err_to_name(ret));
     }
-
-    ESP_LOGI(TAG, "Now restart the ESP32");
-    esp_restart(); // Force a restart
 }
 
 void ota_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "Starting...");
 
-    const char *ota_url = (const char *)pvParameter;
-    ESP_LOGI(TAG, "Using URL: %s", ota_url);
+    const ota_config_t *ota = (const ota_config_t *)pvParameter;
+    ESP_LOGI(TAG, "Using URL: %s", ota->url);
+
+    // Turn off MQTT so we can perform the OTA update
+    stop_mqtt(ota->mqtt_client);
 
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
@@ -287,7 +292,8 @@ void ota_task(void *pvParameter)
 
             ESP_LOGI(TAG, "Rebooting ...");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            stop_comms_and_restart();
+            stop_wifi();
+            esp_restart();
         }
         else
         {
@@ -303,5 +309,6 @@ void ota_task(void *pvParameter)
 ota_end:
     esp_https_ota_abort(https_ota_handle);
     ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    stop_comms_and_restart();
+    stop_wifi();
+    esp_restart();
 }
