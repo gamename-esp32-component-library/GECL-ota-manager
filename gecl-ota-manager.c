@@ -171,7 +171,7 @@ void stop_wifi_and_restart()
     }
     else
     {
-        ESP_LOGE("Failed to deinitialize Wi-Fi: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to deinitialize Wi-Fi: %s", esp_err_to_name(ret));
     }
 
     ESP_LOGI(TAG, "Now restart the ESP32");
