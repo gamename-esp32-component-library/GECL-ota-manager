@@ -108,6 +108,50 @@ void get_burned_in_mac_address(char *mac_str) {
     }
 }
 
+/* Event handler for catching system events */
+static void ota_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    if (event_base == ESP_HTTPS_OTA_EVENT) {
+        switch (event_id) {
+        case ESP_HTTPS_OTA_START:
+            ESP_LOGI(TAG, "OTA started");
+            break;
+        case ESP_HTTPS_OTA_CONNECTED:
+            ESP_LOGI(TAG, "Connected to server");
+            break;
+        case ESP_HTTPS_OTA_GET_IMG_DESC:
+            ESP_LOGI(TAG, "Reading Image Description");
+            break;
+        case ESP_HTTPS_OTA_VERIFY_CHIP_ID:
+            ESP_LOGI(TAG, "Verifying chip id of new image: %d", *(esp_chip_id_t *)event_data);
+            break;
+        case ESP_HTTPS_OTA_DECRYPT_CB:
+            ESP_LOGI(TAG, "Callback to decrypt function");
+            break;
+        case ESP_HTTPS_OTA_WRITE_FLASH:
+            ESP_LOGD(TAG, "Writing to flash: %d written", *(int *)event_data);
+            break;
+        case ESP_HTTPS_OTA_UPDATE_BOOT_PARTITION:
+            ESP_LOGI(TAG, "Boot partition updated. Next Partition: %d", *(esp_partition_subtype_t *)event_data);
+            break;
+        case ESP_HTTPS_OTA_FINISH:
+            ESP_LOGI(TAG, "OTA finish");
+            break;
+        case ESP_HTTPS_OTA_ABORT:
+            ESP_LOGI(TAG, "OTA abort");
+            break;
+        }
+    }
+}
+
+void init_ota_handler() {
+    ESP_LOGI(TAG, "Initializing OTA handler...");
+
+    // Register the OTA event handler
+    ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &ota_event_handler, NULL));
+
+    ESP_LOGI(TAG, "OTA event handler registered.");
+}
+
 static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client) {
     esp_err_t err = ESP_OK;
     /* Uncomment to add custom headers to HTTP request */
@@ -122,13 +166,14 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info) {
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_app_desc_t running_app_info;
     if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
-        ESP_LOGI(TAG, "Running firmware version: %s", running_app_info.version);
+        ESP_LOGI(TAG, "Currently running firmware version: %s", running_app_info.version);
     }
-
+#if 0
     if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
         ESP_LOGW(TAG, "Current running version is the same as new version. Update discontinued.");
         return ESP_FAIL;
     }
+#endif
 
     return ESP_OK;
 }
@@ -187,14 +232,14 @@ void ota_task(void *pvParameter) {
     esp_http_client_config_t _http_config = {
         .url = ota->url,
         .cert_pem = (char *)AmazonRootCA1_pem,
-        .timeout_ms = 120000,
+        .timeout_ms = 10000,
         .keep_alive_enable = true,
     };
 
     esp_https_ota_config_t ota_config = {
         .http_config = &_http_config,
-        .http_client_init_cb =
-            _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
+        // Register a callback to be invoked after esp_http_client is initialized
+        .http_client_init_cb = _http_client_init_cb,
         .partial_http_download = true,
         .max_http_request_size = 4096,
     };
