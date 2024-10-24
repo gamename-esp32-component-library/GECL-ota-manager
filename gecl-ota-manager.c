@@ -208,9 +208,6 @@ void ota_task(void *pvParameter)
     const ota_config_t *ota = (const ota_config_t *)pvParameter;
     ESP_LOGI(TAG, "Using URL: %s", ota->url);
 
-    // Turn off MQTT so we can perform the OTA update
-    stop_mqtt(ota->mqtt_client);
-
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
         .url = ota->url,
