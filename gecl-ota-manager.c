@@ -180,7 +180,7 @@ void ota_task(void *pvParameter) {
     ESP_LOGI(TAG, "Disabling Wi-Fi power save mode during OTA...");
     esp_wifi_set_ps(WIFI_PS_NONE);
 
-    // Turn off MQTT so we can perform the OTA update
+    ESP_LOGI(TAG, "Turn off MQTT so we can perform the update");
     stop_mqtt(ota->mqtt_client);
 
     esp_err_t ota_finish_err = ESP_OK;
