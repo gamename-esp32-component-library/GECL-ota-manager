@@ -180,6 +180,9 @@ void ota_task(void *pvParameter) {
     ESP_LOGI(TAG, "Disabling Wi-Fi power save mode during OTA...");
     esp_wifi_set_ps(WIFI_PS_NONE);
 
+    // Turn off MQTT so we can perform the OTA update
+    stop_mqtt(ota->mqtt_client);
+
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
         .url = ota->url,
@@ -223,7 +226,7 @@ void ota_task(void *pvParameter) {
         // esp_https_ota_perform returns after every read operation which gives user the ability to
         // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
         // data read so far.
-        ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+        // ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
         vTaskDelay(pdMS_TO_TICKS(100)); // Delay to allow other tasks to run
     }
 
