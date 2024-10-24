@@ -186,7 +186,7 @@ void ota_task(void *pvParameter) {
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
         .url = ota->url,
-        // .cert_pem = (char *)AmazonRootCA1_pem,
+        .cert_pem = (char *)AmazonRootCA1_pem,
         .timeout_ms = 120000,
         .keep_alive_enable = true,
     };
