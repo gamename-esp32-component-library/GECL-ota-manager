@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.5)
 idf_component_register(
     SRCS 
         "gecl-ota-manager.c" 
-        "AmazonRootCA1_pem.c"
     INCLUDE_DIRS 
         "include" 
     PRIV_REQUIRES 
@@ -22,4 +21,6 @@ idf_component_register(
         gecl-mqtt-manager
         gecl-time-sync-manager
         lwip
+    EMBED_TXTFILES 
+        "AmazonRootCA1.pem" 
     )
