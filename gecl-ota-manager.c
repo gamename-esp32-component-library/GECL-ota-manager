@@ -36,7 +36,8 @@
 #include "sdkconfig.h"
 
 // External Certificate Authority (CA) certificate for HTTPS connection to AWS S3
-extern const uint8_t AmazonRootCA1_pem[];
+extern const uint8_t server_cert_pem_start[] asm("_binary_AmazonRootCA1_pem_start");
+extern const uint8_t server_cert_pem_end[] asm("_binary_AmazonRootCA1_pem_end");
 
 // Logging tag for OTA messages
 static const char *TAG = "OTA";
@@ -231,7 +232,7 @@ void ota_task(void *pvParameter) {
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t _http_config = {
         .url = ota->url,
-        .cert_pem = (char *)AmazonRootCA1_pem,
+        .cert_pem = (char *)server_cert_pem_start,
         .timeout_ms = 10000,
         .keep_alive_enable = true,
     };
