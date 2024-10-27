@@ -218,7 +218,7 @@ void stop_wifi() {
 }
 
 void ota_task(void *pvParameter) {
-    ESP_LOGI(TAG, "Starting...");
+    ESP_LOGI(TAG, "Starting Task");
 
     const ota_config_t *ota = (const ota_config_t *)pvParameter;
     ESP_LOGI(TAG, "Using URL: %s", ota->url);
