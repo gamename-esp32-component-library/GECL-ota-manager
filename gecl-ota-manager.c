@@ -1,8 +1,12 @@
-#include "gecl-ota-manager.h"
+/*
+ * OTA Update Process for ESP32 Device
+ * ===================================
+ *
+ * This file implements the OTA (Over-The-Air) firmware update mechanism
+ * for ESP32 devices using the ESP-IDF framework.
+ */
 
-#include <inttypes.h>
-#include <mbedtls/sha256.h>
-#include <time.h>
+#include "gecl-ota-manager.h"
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -18,12 +22,14 @@
 #include "sdkconfig.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <inttypes.h> // For PRI macros
+#include <time.h>
 
-// External Certificate Authority (CA) certificate for HTTPS connection to AWS S3
+// External Certificate Authority (CA) certificate for HTTPS connection
 extern const uint8_t server_cert_pem_start[] asm("_binary_AmazonRootCA1_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_AmazonRootCA1_pem_end");
 
-// Logging tag for OTA messages
+// Logging tag
 static const char *TAG = "OTA";
 
 // Global variables
@@ -32,7 +38,6 @@ static SemaphoreHandle_t ota_mutex = NULL;
 
 /**
  * Retrieves the current local timestamp and formats it as a string.
- * This is used for logging and storing the OTA update time.
  */
 void get_current_timestamp(char *buffer, size_t max_len) {
     time_t now;
@@ -44,42 +49,66 @@ void get_current_timestamp(char *buffer, size_t max_len) {
 
 /**
  * Writes the OTA update timestamp to NVS (Non-Volatile Storage).
- * This allows the device to track when the last successful OTA update occurred.
  */
 esp_err_t write_ota_timestamp_to_nvs(const char *timestamp) {
     nvs_handle_t nvs_handle;
     esp_err_t err;
 
-    err = nvs_flash_init(); // Initialize NVS (if not already initialized)
+    err = nvs_flash_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize NVS: %s", esp_err_to_name(err));
         return err;
     }
 
-    err = nvs_open("storage", NVS_READWRITE, &nvs_handle); // Open the NVS handle for writing
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
         return err;
     }
 
-    err = nvs_set_str(nvs_handle, "ota_timestamp", timestamp); // Write the OTA timestamp to NVS
+    err = nvs_set_str(nvs_handle, "ota_timestamp", timestamp);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write timestamp to NVS: %s", esp_err_to_name(err));
         nvs_close(nvs_handle);
         return err;
     }
 
-    err = nvs_commit(nvs_handle); // Commit the changes to NVS
+    err = nvs_commit(nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to commit to NVS: %s", esp_err_to_name(err));
     }
 
-    nvs_close(nvs_handle); // Close the NVS handle
+    nvs_close(nvs_handle);
     return err;
 }
 
 /**
- * Initialize the OTA handler. Ensures that the OTA system starts in a clean state.
+ * Event handler for OTA events.
+ */
+static void ota_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    if (event_base == ESP_HTTPS_OTA_EVENT) {
+        switch (event_id) {
+        case ESP_HTTPS_OTA_START:
+            ESP_LOGI(TAG, "OTA started");
+            break;
+        case ESP_HTTPS_OTA_CONNECTED:
+            ESP_LOGI(TAG, "Connected to OTA server");
+            break;
+        case ESP_HTTPS_OTA_FINISH:
+            ESP_LOGI(TAG, "OTA finished successfully");
+            break;
+        case ESP_HTTPS_OTA_ABORT:
+            ESP_LOGE(TAG, "OTA aborted");
+            break;
+        default:
+            ESP_LOGW(TAG, "Unhandled OTA event: %" PRIi32, event_id); // Using PRI macro
+            break;
+        }
+    }
+}
+
+/**
+ * Initializes the OTA handler.
  */
 void init_ota_handler() {
     ESP_LOGI(TAG, "Initializing OTA handler...");
@@ -94,31 +123,8 @@ void init_ota_handler() {
     ESP_LOGI(TAG, "OTA event handler registered.");
 }
 
-/* Event handler for OTA events */
-static void ota_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-    if (event_base == ESP_HTTPS_OTA_EVENT) {
-        switch (event_id) {
-        case ESP_HTTPS_OTA_START:
-            ESP_LOGI(TAG, "OTA started");
-            break;
-        case ESP_HTTPS_OTA_CONNECTED:
-            ESP_LOGI(TAG, "Connected to server");
-            break;
-        case ESP_HTTPS_OTA_FINISH:
-            ESP_LOGI(TAG, "OTA finished successfully.");
-            break;
-        case ESP_HTTPS_OTA_ABORT:
-            ESP_LOGE(TAG, "OTA aborted.");
-            break;
-        default:
-            ESP_LOGW(TAG, "Unhandled OTA event: %d", event_id);
-            break;
-        }
-    }
-}
-
 /**
- * Start the OTA process. Ensures only one OTA process is running at a time.
+ * OTA task to manage the firmware update process.
  */
 void ota_task(void *pvParameter) {
     ESP_LOGI(TAG, "Starting OTA Task...");
